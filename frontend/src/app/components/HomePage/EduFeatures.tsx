@@ -1,0 +1,156 @@
+import { Users,UserCheck, Calendar, DollarSign, BarChart3, MessageCircle, ArrowRight } from 'lucide-react';
+
+const features = [
+  {
+    icon: Users,
+    title: 'Quản lý học viên',
+    description: 'Theo dõi thông tin, điểm danh, học phí và tiến độ học tập của từng học viên một cách chi tiết.',
+    gradient: 'from-[#667eea] to-[#764ba2]',
+    bgColor: 'rgba(102, 126, 234, 0.1)',
+    textColor: '#667eea',
+    emoji: '🎓',
+    highlight: true
+  },
+  {
+    icon: UserCheck,
+    title: 'Quản lý nhân viên',
+    description: 'Quản lý giáo viên và nhân viên: hồ sơ, phân công công việc, lịch giảng dạy và đánh giá hiệu quả.',
+    gradient: 'from-[#2dd4bf] to-[#14b8a6]',
+    bgColor: 'rgba(45, 212, 191, 0.1)',
+    textColor: '#2dd4bf',
+    emoji: '👥',
+    highlight: true
+  },
+  {
+    icon: Calendar,
+    title: 'Sắp xếp lịch học',
+    description: 'Tự động xếp lịch thông minh, tránh trùng lặp và tối ưu phòng học.',
+    gradient: 'from-[#6bcb77] to-[#4ade80]',
+    bgColor: 'rgba(107, 203, 119, 0.1)',
+    textColor: '#6bcb77',
+    emoji: '🗓️',
+    highlight: true
+  },
+  {
+    icon: DollarSign,
+    title: 'Quản lý tài chính',
+    description: 'Theo dõi học phí, doanh thu, chi phí và báo cáo tài chính chi tiết.',
+    gradient: 'from-[#ffd93d] to-[#f59e0b]',
+    bgColor: 'rgba(255, 217, 61, 0.1)',
+    textColor: '#f59e0b',
+    emoji: '💳',
+    highlight: true
+  },
+  {
+    icon: BarChart3,
+    title: 'Báo cáo & Thống kê',
+    description: 'Dashboard trực quan với các biểu đồ và báo cáo theo thời gian thực.',
+    gradient: 'from-[#ff6b6b] to-[#ef4444]',
+    bgColor: 'rgba(255, 107, 107, 0.1)',
+    textColor: '#ff6b6b',
+    emoji: '📊',
+    highlight: true
+  },
+  {
+    icon: MessageCircle,
+    title: 'Tương tác phụ huynh',
+    description: 'Gửi thông báo, nhắn tin và cập nhật tình hình học tập cho phụ huynh.',
+    gradient: 'from-[#a78bfa] to-[#8b5cf6]',
+    bgColor: 'rgba(167, 139, 250, 0.1)',
+    textColor: '#a78bfa',
+    emoji: '💬',
+    highlight: true
+  }
+];
+
+export function EduFeatures() {
+  return (
+    <section id="features" className="py-16 sm:py-24 bg-[#f8faff]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center px-4 py-2 rounded-full mb-4 bg-[#7494ec]/10">
+            <span className="text-sm font-semibold text-[#7494ec]">Tính năng nổi bật</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 text-[#1a1a2e]">
+            Mọi thứ bạn cần để
+            <br />
+            <span className="text-[#7494ec]">quản lý hiệu quả</span>
+          </h2>
+
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Hệ thống tích hợp đầy đủ các công cụ giúp bạn quản lý trung tâm một cách chuyên nghiệp
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+
+            if (feature.highlight) {
+              // Featured card with special styling
+              return (
+                <div
+                  key={index}
+                  className="card-hover bg-white rounded-3xl p-8 shadow-2xl border-2 hover:border-purple-300 neon-border pattern-dots relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-200 to-indigo-200 opacity-20 rounded-full -mr-16 -mt-16"></div>
+
+                  <div
+                    className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 feature-icon-glow relative z-10 bg-gradient-to-br ${feature.gradient}`}
+                  >
+                    <Icon className="w-10 h-10 text-white" strokeWidth={2.5} />
+                  </div>
+
+                  <h3 className="text-2xl font-black mb-4 heading-font gradient-text">
+                    {feature.title}
+                  </h3>
+
+                  <p className="text-gray-600 mb-6 leading-relaxed text-base">
+                    {feature.description}
+                  </p>
+
+                  <a href="#" className="inline-flex items-center font-bold gradient-text hover:underline text-lg group">
+                    Tìm hiểu thêm
+                    <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-2" strokeWidth={2.5} />
+                  </a>
+
+                  <div className="absolute bottom-4 right-4 text-6xl opacity-10">
+                    {feature.emoji}
+                  </div>
+                </div>
+              );
+            }
+
+            // Regular cards
+            return (
+              <div
+                key={index}
+                className="card-hover bg-white rounded-2xl p-6 sm:p-8 shadow-lg border border-gray-100"
+              >
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br ${feature.gradient}`}
+                >
+                  <Icon className="w-7 h-7 text-white" />
+                </div>
+
+                <h3 className="text-xl font-bold mb-3 text-[#1a1a2e]">
+                  {feature.title}
+                </h3>
+
+                <p className="text-gray-600 mb-4">
+                  {feature.description}
+                </p>
+
+                <a href="#" className="inline-flex items-center font-semibold text-[#7494ec]">
+                  Tìm hiểu thêm
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -5,8 +5,11 @@ interface User {
   id: number
   fullName: string
   email: string
+  phoneNumber: string
   roleId: string
+  gender: boolean
   image?: string
+  createdAt: string
 }
 
 interface AuthContextType {
@@ -25,9 +28,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // verify token khi app load
  useEffect(() => {
   api
-    .get('/v1/api/auth/me')
+    .get('/auth/me')
     .then(res => {
       const data = res as unknown as { user: User }
+      console.log(res)
       setUser(data.user)
     })
     .catch(() => {
@@ -42,7 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
   try {
-    await api.post('/v1/api/logout', {}, { withCredentials: true })
+    await api.post('/logout', {}, { withCredentials: true })
   } catch (err) {
     console.error('Logout error', err)
   } finally {

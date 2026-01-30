@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Menu, X, Bell, Settings, MessageSquare, User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom';
+import {  getRoleName } from "../../utils/helpers";
 
 export function EduHeader() {
   const { user, logout } = useAuth()
@@ -15,19 +16,6 @@ export function EduHeader() {
   const handleLogout = () => {
     logout();
     navigate('/');
-  };
-
-  const getRoleName = (roleId: string) => {
-    switch (roleId) {
-      case 'R0':
-        return 'Admin';
-      case 'R1':
-        return 'Giáo viên';
-      case 'R3':
-        return 'Học sinh';
-      default:
-        return 'Chưa xác định';
-    }
   };
 
   useEffect(() => {
@@ -154,7 +142,7 @@ export function EduHeader() {
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden flex items-center justify-center ring-1 ring-purple/30 bg-white">
                   {user?.image ? (
                     <img
-                      src={`${import.meta.env.VITE_BACKEND_URL}${user.image}`}
+                      src={`${import.meta.env.VITE_BACKEND_URL_IMAGE}${user.image}`}
                       alt={user.fullName}
                       className="w-full h-full object-cover"
                     />
@@ -184,7 +172,7 @@ export function EduHeader() {
                     </p>
                   </div>
 
-                  <a href="#" className="flex items-center space-x-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">
+                  <a href="/admin/profile" className="flex items-center space-x-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors">
                     <User className="w-4 h-4" />
                     <span className="text-sm">Hồ sơ cá nhân</span>
                   </a>

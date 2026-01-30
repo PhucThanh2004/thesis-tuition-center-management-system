@@ -1,6 +1,6 @@
 import { X, Mail, Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { loginApi } from '../../utils/api/loginApi'
+import { loginApi } from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -40,7 +40,7 @@ export function LoginModal({
 
             login(res.user)
             onClose()
-            navigate('/admin')
+            navigate('/admin/home')
         } catch (err: any) {
             setError(err?.response?.data?.message || 'Sai email hoặc mật khẩu')
         } finally {

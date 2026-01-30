@@ -7,6 +7,7 @@ import { Home } from './app/pages/HomePage';
 import { AdminHomePage } from './app/pages/admin/AdminHomePage';
 import { MainLayout } from './app/pages/admin/MainAdminLayout';
 import { StudentPage } from './app/pages/admin/StudentPage';
+import { ProfilePage } from './app/pages/admin/ProfilePage';
 import { useState } from 'react';
 
 function App() {
@@ -48,6 +49,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <StudentPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Trang profile ( admin) */}
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

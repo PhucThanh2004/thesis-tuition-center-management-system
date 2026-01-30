@@ -1,0 +1,143 @@
+import { useEffect, useState } from "react";
+import { Camera, Mail, Phone, Calendar, Shield, User } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext'
+import { formatDate, getRoleName } from "../../../utils/helpers";
+import { studentApi, subjectApi, teacherApi } from '../../../utils/api'
+
+export function ProfileHeader() {
+  const { user } = useAuth();
+
+  const [imageError, setImageError] = useState(false);
+
+  const [totalStudents, setTotalStudents] = useState<number>(0)
+
+  const [totalSubjects, setTotalSubjects] = useState<number>(0)
+
+  const [totalTeachers, setTotalTeachers] = useState<number>(0);
+
+  useEffect(() => {
+    studentApi.getStatistics()
+      .then(res => {
+        setTotalStudents(res.totalStudents)
+      })
+      .catch(err => {
+        console.error('Lỗi lấy thống kê học sinh', err)
+      })
+
+    subjectApi.getStatistics()
+      .then(res => {
+        setTotalSubjects(res.totalSubjects)
+      })
+      .catch(err => console.error(err))
+
+    teacherApi.getStatistics()
+      .then(res => {
+        setTotalTeachers(res.totalTeachers);
+      })
+      .catch(err => console.error('Lỗi lấy thống kê giáo viên', err));
+  }, [])
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+      {/* Cover Image */}
+      <div
+        className="h-32 sm:h-48 relative"
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
+        }}
+      >
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-10 left-10 w-20 h-20 bg-white/30 rounded-full blur-xl"></div>
+          <div className="absolute top-20 right-20 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-10 left-1/3 w-24 h-24 bg-white/25 rounded-full blur-xl"></div>
+        </div>
+      </div>
+
+      {/* Profile Info */}
+      <div className="px-6 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-16 sm:-mt-20">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            {/* Avatar */}
+            <div className="relative">
+              <div className="w-32 h-32 rounded-2xl bg-white p-2 shadow-xl ring-4 ring-white">
+                {imageError || !user?.image ? ( // Nếu có lỗi hoặc không có ảnh
+                  <div
+                    className="w-full h-full rounded-xl flex items-center justify-center text-white text-4xl font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex', // Hiện icon User khi không có ảnh
+                    }}
+                  >
+                    <User className="w-16 h-16 sm:w-20 sm:h-20 text-white" />
+                  </div>
+                ) : (
+                  <img
+                    src={`${import.meta.env.VITE_BACKEND_URL_IMAGE}${user.image}`}
+                    className="w-full h-full object-cover rounded-xl"
+                    onError={handleImageError} // Xử lý lỗi ảnh
+                    alt={user?.fullName} // Tên người dùng sẽ là alt
+                  />
+                )}
+              </div>
+              <button className="absolute bottom-2 right-2 bg-white hover:bg-gray-50 p-2 rounded-lg shadow-lg border border-gray-200 transition-all">
+                <Camera className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Name and Title */}
+            <div className="mb-2 mt-24">
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{user?.fullName}</h1>
+                <div className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  <span className="text-xs font-semibold"> {user?.roleId && getRoleName(user.roleId)}</span>
+                </div>
+              </div>
+              <p className="text-gray-600  mb-2">Quản trị viên hệ thống</p>
+
+              <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  <span>{user?.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  <span>{user?.phoneNumber}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>Tham gia: {formatDate(user?.createdAt)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900">{totalStudents}</div>
+            <div className="text-sm text-gray-600">Học viên</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900">{totalSubjects}</div>
+            <div className="text-sm text-gray-600">Khóa học</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900">{totalTeachers}</div>
+            <div className="text-sm text-gray-600">Giáo viên</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900">365</div>
+            <div className="text-sm text-gray-600">Ngày hoạt động</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

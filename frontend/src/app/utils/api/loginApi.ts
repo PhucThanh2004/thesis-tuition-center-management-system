@@ -6,6 +6,7 @@ export interface LoginResponse {
     id: number
     fullName: string
     email: string
+    phoneNumber: string
     roleId: string
     image?: string
   }
@@ -15,5 +16,5 @@ export const loginApi = (
   email: string,
   password: string
 ): Promise<LoginResponse> => {
-  return axios.post('/v1/api/login', { email, password })
+  return axios.post('/login', { email, password })
 }

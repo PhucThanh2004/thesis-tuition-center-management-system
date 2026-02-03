@@ -8,6 +8,7 @@ import { AdminHomePage } from './app/pages/admin/AdminHomePage';
 import { MainLayout } from './app/pages/admin/MainAdminLayout';
 import { StudentPage } from './app/pages/admin/StudentPage';
 import { ProfilePage } from './app/pages/admin/ProfilePage';
+import { ClassListPage } from './app/pages/admin/ClassListPage'; 
 import { useState } from 'react';
 
 function App() {
@@ -59,6 +60,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Trang danh sách lớp học ( admin) */}
+          <Route
+            path="class"
+            element={
+              <ProtectedRoute>
+                <ClassListPage />
               </ProtectedRoute>
             }
           />

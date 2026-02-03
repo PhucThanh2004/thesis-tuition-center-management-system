@@ -1,9 +1,16 @@
 import { Lock, Key, Smartphone, Shield, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { useAuth } from '../../../contexts/AuthContext'
+import { formatDate, daysSince } from '../../../utils/helpers';
 
 export function SecuritySettings() {
+
+  const { user } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  const days = daysSince(user?.passwordUpdatedAt)
+  const shouldSuggestChange = days >= 60
 
   return (
     <>
@@ -21,10 +28,10 @@ export function SecuritySettings() {
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-1">Đổi mật khẩu</h4>
                   <p className="text-sm text-gray-600">Cập nhật mật khẩu định kỳ để bảo vệ tài khoản</p>
-                  <p className="text-xs text-gray-500 mt-1">Đổi lần cuối: 15/01/2025</p>
+                  <p className="text-xs text-gray-500 mt-1">Đổi lần cuối: {formatDate(user?.passwordUpdatedAt)}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowPasswordModal(true)}
                 className="px-4 py-2 text-sm font-semibold text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
               >
@@ -32,6 +39,30 @@ export function SecuritySettings() {
               </button>
             </div>
           </div>
+
+          {shouldSuggestChange && (
+            <div className="p-4 rounded-xl bg-yellow-50 border border-yellow-200">
+              <div className="flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-yellow-900 mb-1">
+                    Khuyến nghị đổi mật khẩu
+                  </h4>
+                  <p className="text-sm text-yellow-800">
+                    Mật khẩu của bạn đã được sử dụng <b>{days}</b> ngày.
+                    Nên đổi mật khẩu để tăng cường bảo mật.
+                  </p>
+                  <button
+                    onClick={() => setShowPasswordModal(true)}
+                    className="mt-2 text-sm font-semibold text-yellow-700 hover:underline"
+                  >
+                    Đổi mật khẩu ngay →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {/* Two-Factor Authentication */}
           <div className="p-4 rounded-xl border border-gray-200 hover:border-purple-300 transition-all group">
@@ -110,9 +141,9 @@ export function SecuritySettings() {
       </div>
 
       {/* Change Password Modal */}
-      <ChangePasswordModal 
-        isOpen={showPasswordModal} 
-        onClose={() => setShowPasswordModal(false)} 
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
       />
     </>
   );

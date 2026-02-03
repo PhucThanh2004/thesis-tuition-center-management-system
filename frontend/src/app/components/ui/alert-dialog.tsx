@@ -1,157 +1,139 @@
-"use client";
+import * as React from "react"
+import { cn } from "./utils"
+import { X } from "lucide-react"
 
-import * as React from "react";
-import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
-
-import { cn } from "./utils";
-import { buttonVariants } from "./button";
-
-function AlertDialog({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
-  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
+interface AlertDialogProps {
+  open: boolean
+  onClose: () => void
+  children: React.ReactNode
 }
 
-function AlertDialogTrigger({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Trigger>) {
-  return (
-    <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
-  );
-}
+export function AlertDialog({
+  open,
+  onClose,
+  children,
+}: AlertDialogProps) {
+  if (!open) return null
 
-function AlertDialogPortal({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
   return (
-    <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />
-  );
-}
-
-function AlertDialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
-  return (
-    <AlertDialogPrimitive.Overlay
-      data-slot="alert-dialog-overlay"
-      className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function AlertDialogContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
-  return (
-    <AlertDialogPortal>
-      <AlertDialogOverlay />
-      <AlertDialogPrimitive.Content
-        data-slot="alert-dialog-content"
+    <div
+      className="fixed inset-0 z-50 grid place-content-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
-          className,
+          "w-full max-w-md rounded-lg bg-white p-6 shadow-lg",
+          "animate-[alert-dialog-in_200ms_cubic-bezier(0.16,1,0.3,1)]"
         )}
-        {...props}
-      />
-    </AlertDialogPortal>
-  );
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  )
 }
 
-function AlertDialogHeader({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+/* ---------- Sub components ---------- */
+
+export function AlertDialogHeader({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div
-      data-slot="alert-dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
-  );
+    <div className="flex items-start justify-between">
+      {children}
+    </div>
+  )
 }
 
-function AlertDialogFooter({
+export function AlertDialogTitle({
   className,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <div
-      data-slot="alert-dialog-footer"
+    <h2
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className,
+        "text-xl font-bold text-gray-900 sm:text-2xl",
+        className
       )}
       {...props}
     />
-  );
+  )
 }
 
-function AlertDialogTitle({
+export function AlertDialogClose({
+  onClick,
+}: {
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close"
+      className="-me-4 -mt-4 rounded-full p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+    >
+      <X className="h-5 w-5" />
+    </button>
+  )
+}
+
+export function AlertDialogDescription({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
+}: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <AlertDialogPrimitive.Title
-      data-slot="alert-dialog-title"
-      className={cn("text-lg font-semibold", className)}
+    <p
+      className={cn("mt-4 text-gray-700 leading-relaxed", className)}
       {...props}
     />
-  );
+  )
 }
 
-function AlertDialogDescription({
+export function AlertDialogFooter({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <AlertDialogPrimitive.Description
-      data-slot="alert-dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+    <footer
+      className={cn("mt-6 flex justify-end gap-2", className)}
       {...props}
     />
-  );
+  )
 }
 
-function AlertDialogAction({
+export function AlertDialogCancel({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Action>) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <AlertDialogPrimitive.Action
-      className={cn(buttonVariants(), className)}
+    <button
+      type="button"
+      className={cn(
+        "rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 \
+   hover:bg-gray-200 hover:-translate-y-1 hover:shadow-lg active:translate-y-0",
+        className
+      )}
       {...props}
     />
-  );
+  )
 }
 
-function AlertDialogCancel({
+export function AlertDialogAction({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <AlertDialogPrimitive.Cancel
-      className={cn(buttonVariants({ variant: "outline" }), className)}
+    <button
+      type="button"
+      className={cn(
+        "rounded btn-gradient px-4 py-2 text-sm font-medium text-white transition",
+        className
+      )}
       {...props}
     />
-  );
+  )
 }
-
-export {
-  AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-};

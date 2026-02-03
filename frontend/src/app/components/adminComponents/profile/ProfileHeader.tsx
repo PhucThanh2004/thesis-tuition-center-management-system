@@ -1,10 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Camera, Mail, Phone, Calendar, Shield, User } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext'
 import { formatDate, getRoleName } from "../../../utils/helpers";
-import { studentApi, subjectApi, teacherApi } from '../../../utils/api'
+import { studentApi, subjectApi, teacherApi, userApi } from '../../../utils/api'
+import { useOutletContext } from "react-router-dom"
+import {
+  AlertDialog,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogClose,
+} from "../../../components/ui/alert-dialog"
+
 
 export function ProfileHeader() {
+  const { setAlert } = useOutletContext<{
+    setAlert: React.Dispatch<
+      React.SetStateAction<{
+        type: "success" | "error"
+        message: string
+      } | null>
+    >
+  }>()
   const { user } = useAuth();
 
   const [imageError, setImageError] = useState(false);
@@ -14,6 +34,24 @@ export function ProfileHeader() {
   const [totalSubjects, setTotalSubjects] = useState<number>(0)
 
   const [totalTeachers, setTotalTeachers] = useState<number>(0);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+
+  const getActiveDays = (createdAt?: string) => {
+    if (!createdAt) return 0
+
+    const start = new Date(createdAt)
+    const now = new Date()
+
+    const diffTime = now.getTime() - start.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+    return diffDays >= 0 ? diffDays : 0
+  }
 
   useEffect(() => {
     studentApi.getStatistics()
@@ -41,6 +79,42 @@ export function ProfileHeader() {
     setImageError(true);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setPendingFile(file)
+    setConfirmOpen(true)
+  }
+
+  const handleConfirmUpload = async () => {
+    if (!pendingFile) return
+
+    try {
+      setUploading(true)
+
+      const res = await userApi.updateUserImage(pendingFile)
+      user!.image = res.image
+      setImageError(false)
+
+      setAlert({
+        type: "success",
+        message: "Ảnh đại diện đã được cập nhật thành công",
+      })
+    } catch (err) {
+      console.error(err)
+      setAlert({
+        type: "error",
+        message: "Cập nhật ảnh đại diện thất bại",
+      })
+    } finally {
+      setUploading(false)
+      setConfirmOpen(false)
+      setPendingFile(null)
+    }
+  }
+
+
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
       {/* Cover Image */}
@@ -64,12 +138,12 @@ export function ProfileHeader() {
             {/* Avatar */}
             <div className="relative">
               <div className="w-32 h-32 rounded-2xl bg-white p-2 shadow-xl ring-4 ring-white">
-                {imageError || !user?.image ? ( // Nếu có lỗi hoặc không có ảnh
+                {imageError || !user?.image ? (
                   <div
                     className="w-full h-full rounded-xl flex items-center justify-center text-white text-4xl font-bold"
                     style={{
                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      display: 'flex', // Hiện icon User khi không có ảnh
+                      display: 'flex',
                     }}
                   >
                     <User className="w-16 h-16 sm:w-20 sm:h-20 text-white" />
@@ -78,12 +152,29 @@ export function ProfileHeader() {
                   <img
                     src={`${import.meta.env.VITE_BACKEND_URL_IMAGE}${user.image}`}
                     className="w-full h-full object-cover rounded-xl"
-                    onError={handleImageError} // Xử lý lỗi ảnh
-                    alt={user?.fullName} // Tên người dùng sẽ là alt
+                    onError={handleImageError}
+                    alt={user?.fullName}
                   />
                 )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
               </div>
-              <button className="absolute bottom-2 right-2 bg-white hover:bg-gray-50 p-2 rounded-lg shadow-lg border border-gray-200 transition-all">
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className={`absolute bottom-2 right-2 p-2 rounded-lg shadow-lg border transition-all
+    ${uploading
+                    ? 'bg-gray-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-gray-50 border-gray-200'
+                  }`}
+              >
                 <Camera className="w-4 h-4 text-gray-600" />
               </button>
             </div>
@@ -133,11 +224,34 @@ export function ProfileHeader() {
             <div className="text-sm text-gray-600">Giáo viên</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">365</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {getActiveDays(user?.createdAt)}
+            </div>
             <div className="text-sm text-gray-600">Ngày hoạt động</div>
           </div>
         </div>
       </div>
+      <AlertDialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Xác nhận thay đổi ảnh</AlertDialogTitle>
+          <AlertDialogClose onClick={() => setConfirmOpen(false)} />
+        </AlertDialogHeader>
+
+        <AlertDialogDescription>
+          Bạn có chắc chắn muốn cập nhật ảnh đại diện mới không?
+        </AlertDialogDescription>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setConfirmOpen(false)}>
+            Huỷ
+          </AlertDialogCancel>
+
+          <AlertDialogAction onClick={handleConfirmUpload}>
+            Đồng ý
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialog>
+
     </div>
   );
 }

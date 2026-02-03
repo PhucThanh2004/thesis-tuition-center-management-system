@@ -1,5 +1,8 @@
 import { X, Eye, EyeOff, Lock, AlertCircle, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { userApi } from '../../../utils/api'
+import { useOutletContext } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -7,6 +10,7 @@ interface ChangePasswordModalProps {
 }
 
 export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {
+  const { setAlert } = useOutletContext<any>()
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,6 +19,18 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
 
   // Password strength checker
   const getPasswordStrength = (password: string) => {
@@ -30,49 +46,66 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const strengthLabels = ['Rất yếu', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'];
   const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-emerald-500'];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess(false)
 
-    // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('Vui lòng điền đầy đủ thông tin');
-      return;
+      setError('Vui lòng điền đầy đủ thông tin')
+      return
     }
 
     if (newPassword.length < 8) {
-      setError('Mật khẩu mới phải có ít nhất 8 ký tự');
-      return;
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự')
+      return
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp');
-      return;
+      setError('Mật khẩu xác nhận không khớp')
+      return
     }
 
     if (currentPassword === newPassword) {
-      setError('Mật khẩu mới phải khác mật khẩu hiện tại');
-      return;
+      setError('Mật khẩu mới phải khác mật khẩu hiện tại')
+      return
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      setSuccess(true);
+    try {
+      await userApi.changePassword({
+        currentPassword,
+        newPassword,
+      })
+
+      setAlert({
+        type: 'success',
+        message: 'Đổi mật khẩu thành công',
+      })
+
       setTimeout(() => {
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        onClose();
-        setSuccess(false);
-      }, 2000);
-    }, 1000);
-  };
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+        setSuccess(false)
+        onClose()
+      }, 1500)
+
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || 'Đổi mật khẩu thất bại'
+      )
+      setAlert({
+        type: 'error',
+        message: 'Đổi mật khẩu thất bại',
+      })
+    }
+  }
+
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
@@ -279,7 +312,8 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -92,7 +92,7 @@ export function EduHeader() {
             </button>
 
             <button
-              onClick={() => navigateToPage('#')}
+              onClick={() => navigateToPage('/admin/class')}
               className={`nav-link font-medium transition-all
       ${isActive('/admin/class')
                   ? 'gradient-text'

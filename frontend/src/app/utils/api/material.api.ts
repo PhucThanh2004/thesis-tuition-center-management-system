@@ -8,12 +8,12 @@ import type {
 } from '../types/material'
 
 export const materialApi = {
-  // ✅ 1. GET materials by subject (đã có, chỉ sửa type)
+  // ✅ 1. GET materials by subject
   getBySubject(subjectId: number): Promise<MaterialResponse> {
     return axios.get(`/materials/subject/${subjectId}`)
   },
 
-  // ✅ 2. UPLOAD material (đã có, chỉ sửa type)
+  // ✅ 2. UPLOAD material
   upload(data: {
     title: string
     subjectId: number
@@ -33,7 +33,7 @@ export const materialApi = {
     })
   },
 
-  // ✅ 3. UPDATE material (đã có, chỉ sửa type)
+  // ✅ 3. UPDATE material - SỬA ENDPOINT ĐÚNG
   update(
     materialId: number,
     data: {
@@ -45,32 +45,29 @@ export const materialApi = {
     if (data.file) formData.append('file', data.file)
     if (data.title) formData.append('title', data.title)
 
-    return axios.put(`/materials/${materialId}/file`, formData, {
+    // SỬA: endpoint phải là `/materials/${materialId}` vì backend dùng @PutMapping("/materials/{materialId}")
+    return axios.put(`/materials/${materialId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
   },
 
-  // ✅ 4. DELETE material (đã có)
+  // ✅ 4. DELETE material
   delete(materialId: number): Promise<DeleteMaterialResponse> {
     return axios.delete(`/materials/${materialId}`)
   },
 
   // ============= CÁC UTILITY FUNCTION =============
   
-  // ✅ Helper: Lấy URL tải file (không cần API riêng)
   getDownloadUrl(fileURL: string): string {
     const baseURL = import.meta.env.VITE_BACKEND_URL
-    // Remove duplicate /v1/api if fileURL already contains it
     const cleanFileURL = fileURL.startsWith('/') ? fileURL : `/${fileURL}`
     return `${baseURL}${cleanFileURL}`
   },
 
-  // ✅ Helper: Mở file trong tab mới hoặc tải về
   downloadFile(fileURL: string, fileName?: string): void {
     const url = this.getDownloadUrl(fileURL)
-    // Tạo thẻ a để tải file
     const link = document.createElement('a')
     link.href = url
     link.download = fileName || url.split('/').pop() || 'download'
@@ -79,13 +76,11 @@ export const materialApi = {
     document.body.removeChild(link)
   },
 
-  // ✅ Helper: Mở file preview (nếu là PDF, image...)
   previewFile(fileURL: string): void {
     const url = this.getDownloadUrl(fileURL)
     window.open(url, '_blank')
   },
 
-  // ✅ Helper: Format file size (đã có trong backend nhưng có thể dùng thêm)
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes'
     const k = 1024

@@ -112,7 +112,9 @@ export interface TeacherLeaveApproveRequest {
 export interface TeacherLeaveFilter {
   page?: number;
   size?: number;
-  status?: string;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';  
+  startDate?: string;  
+  endDate?: string; 
 }
 
 export interface TeacherLeaveStats {
@@ -145,8 +147,11 @@ export interface SuggestedTeacher {
   name: string;
 }
 
+// src/types/teacherLeave.ts (cập nhật AffectedSession)
+
 export interface AffectedSession {
   id: number;
+  affectedSessionId: number;  // Thêm field này
   sessionId: number;
   sessionDate: string;
   startTime: string;
@@ -154,13 +159,15 @@ export interface AffectedSession {
   subjectId: number;
   subjectName?: string;
   originalTeacherId: number;
+  originalTeacherName?: string;  // Thêm field này
   replacementTeacherId?: number;
   replacementTeacherName?: string;
-  status: 'PENDING' | 'RESOLVED' | 'SKIPPED';
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'RESOLVED' | 'SKIPPED';  // Thêm 'ACCEPTED', 'REJECTED'
   suggestedTeachers?: SuggestedTeacher[];
   date: string;
   className: string;
   room: string;
+  roomName?: string;  // Thêm field này
   substituteTeacher?: string;
 }
 
@@ -195,4 +202,52 @@ export interface PreviewReplacementPlanRequest {
   startTime?: string;
   endTime?: string;
   replacements?: ReplacementSelection[];
+}
+
+//Thêm cho giao diện của giáo viên khi xem chi tiết đơn nghỉ phép của mình
+export interface SubstituteRequestForTeacher {
+  affectedSessionId: number;
+  sessionId: number;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  subjectName: string;
+  subjectId: number;
+  className?: string;
+  roomName?: string;
+  originalTeacherId: number;
+  originalTeacherName: string;
+  replacementTeacherId?: number;
+  replacementTeacherName?: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'RESOLVED' | 'SKIPPED';
+  suggestedTeachers?: SuggestedTeacher[];
+}
+
+export interface SubstituteRequestResponse {
+  affectedSessionId: number;
+  response: 'ACCEPTED' | 'REJECTED';
+}
+
+export interface ReplacementSession {
+  id: number;
+  affectedSessionId: number;
+  sessionId: number;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  subjectId: number;
+  subjectName: string;
+  className: string;
+  roomName: string;
+  originalTeacherId: number;
+  originalTeacherName: string;
+  replacementTeacherId: number;
+  replacementTeacherName: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED';
+  reason?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Thêm các field optional để tương thích
+  room?: string;
+  date?: string;
 }

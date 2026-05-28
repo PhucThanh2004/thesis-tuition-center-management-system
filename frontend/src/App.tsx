@@ -28,6 +28,7 @@ import { SalaryAgreementDetailPage } from './app/pages/admin/contract/SalaryAgre
 import { LeaveCalendarPage } from './app/pages/admin/leaves/LeaveCalendarPage';
 import { LeaveRequestDetail } from './app/pages/admin/leaves/LeaveRequestDetail';
 import { LeaveManagementPage } from './app/pages/admin/leaves/LeaveManagementPage';
+import { TeacherLeaveManagementPage } from './app/pages/teacher/TeacherLeaveManagementPage';
 
 function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -268,6 +269,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['R1']}>
                 <AnnouncementPage isTeacher={true} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="leaves"
+            element={
+              <ProtectedRoute allowedRoles={['R1']}>
+                <TeacherLeaveManagementPage />
               </ProtectedRoute>
             }
           />

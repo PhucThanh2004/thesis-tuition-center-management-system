@@ -7,6 +7,8 @@ import {
   Sparkles,
   AlertTriangle,
   ChevronRight,
+  XCircle,
+  CheckCircle,
 } from 'lucide-react';
 import { teacherLeaveApi } from '../../../utils/api/teacherLeave.api';
 import type { PreviewAffectedSessionResponse } from '../../../utils/types/teacherLeave'; 
@@ -21,8 +23,9 @@ interface LeaveApprovalModalProps {
   reason: string;
   affectedSessions: PreviewAffectedSessionResponse[];
   onApprove: (options: {
-    approvalType: 'full_leave' | 'replace';
+    approvalType: 'full_leave' | 'flexible';
     replacements: Record<string, string>;
+    cancelledSessions: string[];
     comment: string;
   }) => void;
   onReject?: () => void;
@@ -42,8 +45,9 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   onReject,
   isSubmitting = false,
 }) => {
-  const [approvalType, setApprovalType] = useState<'full_leave' | 'replace'>('full_leave');
+  const [approvalType, setApprovalType] = useState<'full_leave' | 'flexible'>('full_leave');
   const [replacements, setReplacements] = useState<Record<string, string>>({});
+  const [cancelledSessions, setCancelledSessions] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [availableTeachersMap, setAvailableTeachersMap] = useState<Record<string, any[]>>({});
   const [loadingTeachers, setLoadingTeachers] = useState<Record<string, boolean>>({});
@@ -51,18 +55,35 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   if (!isOpen) return null;
 
   const totalSessions = affectedSessions.length;
-  const selectedCount = Object.keys(replacements).filter(
-    (id) => replacements[id] && replacements[id] !== ''
-  ).length;
-  const isReplaceIncomplete = approvalType === 'replace' && totalSessions > 0 && selectedCount !== totalSessions;
+  
+  // Đếm số buổi đã được xử lý (thay thế hoặc hủy) - chỉ áp dụng cho chế độ linh hoạt
+  const processedSessions = Object.keys(replacements).filter(id => replacements[id] && replacements[id] !== '').length + cancelledSessions.length;
+  const isFlexibleIncomplete = approvalType === 'flexible' && totalSessions > 0 && processedSessions !== totalSessions;
 
   const handleReplaceChange = (sessionId: string, teacherId: string) => {
     setReplacements((prev) => ({ ...prev, [sessionId]: teacherId }));
+    // Nếu đã chọn giáo viên, loại khỏi danh sách hủy nếu có
+    if (teacherId && teacherId !== '') {
+      setCancelledSessions(prev => prev.filter(id => id !== sessionId));
+    }
   };
 
-  // Trong component, thay `session.sessionId` bằng `session.id` (đã map ở trên)
+  const handleCancelSession = (sessionId: string) => {
+    if (cancelledSessions.includes(sessionId)) {
+      // Nếu đã hủy, bỏ hủy
+      setCancelledSessions(prev => prev.filter(id => id !== sessionId));
+    } else {
+      // Nếu chưa hủy, thêm vào danh sách hủy và xóa replacement nếu có
+      setCancelledSessions(prev => [...prev, sessionId]);
+      setReplacements(prev => {
+        const newReplacements = { ...prev };
+        delete newReplacements[sessionId];
+        return newReplacements;
+      });
+    }
+  };
+
   const loadAvailableTeachers = async (sessionId: string) => {
-    // sessionId lúc này là id của session (đã map)
     if (availableTeachersMap[sessionId]?.length) return;
     setLoadingTeachers(prev => ({ ...prev, [sessionId]: true }));
     try {
@@ -77,7 +98,6 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
       setAvailableTeachersMap(prev => ({ ...prev, [sessionId]: teachers }));
     } catch (error: any) {
       console.error('Lỗi tải danh sách giáo viên thay thế:', error);
-      // Fallback: hiển thị input text thay vì dropdown
       setAvailableTeachersMap(prev => ({ ...prev, [sessionId]: [] }));
     } finally {
       setLoadingTeachers(prev => ({ ...prev, [sessionId]: false }));
@@ -85,10 +105,12 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (approvalType === 'replace' && isReplaceIncomplete) return;
+    if (approvalType === 'flexible' && isFlexibleIncomplete) return;
+    
     onApprove({
       approvalType,
       replacements,
+      cancelledSessions,
       comment,
     });
   };
@@ -105,11 +127,13 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
     return date;
   };
 
+  const remainingSessions = totalSessions - processedSessions;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-4xl rounded-xl shadow-xl overflow-hidden border border-gray-200">
+      <div className="bg-white w-full max-w-4xl rounded-xl shadow-xl overflow-hidden border border-gray-200 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+        <header className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={onClose}
@@ -125,7 +149,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
           </div>
         </header>
 
-        <div className="p-6 overflow-y-auto max-h-[70vh] space-y-8">
+        <div className="p-6 overflow-y-auto flex-1 space-y-8">
           {/* Teacher Info */}
           <section className="flex items-center gap-5 p-5 rounded-xl bg-gray-50 border border-gray-100">
             <img
@@ -166,43 +190,84 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Ngày/Giờ</th>
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Môn học</th>
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Giáo viên thay thế</th>
+                      {approvalType === 'flexible' && (
+                        <th className="px-5 py-3 text-sm font-semibold text-gray-600 text-center">Hành động</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {affectedSessions.map((session, idx) => (
-                      <tr key={session.sessionId ?? idx}>
-                        <td className="px-5 py-4 text-sm text-gray-500">
-                          {formatDateTime(session.sessionDate, session.startTime, session.endTime)}
-                        </td>
-                        <td className="px-5 py-4 text-sm font-medium text-gray-800">
-                          {session.subjectName}
-                        </td>
-                        <td className="px-5 py-4">
-                          <select
-                            value={replacements[String(session.sessionId)] || ''}
-                            onChange={(e) => handleReplaceChange(String(session.sessionId), e.target.value)}
-                            onFocus={() => {
-                              if (session.sessionId) {
-                                loadAvailableTeachers(String(session.sessionId));
-                              }
-                            }} 
-                            className="w-full bg-white border border-gray-200 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                            disabled={approvalType === 'full_leave' || isSubmitting}
-                          >
-                            <option value="">Chọn giáo viên...</option>
-                            {loadingTeachers[String(session.sessionId)] ? (
-                              <option disabled>Đang tải...</option>
+                    {affectedSessions.map((session, idx) => {
+                      const sessionId = String(session.sessionId);
+                      const isCancelled = cancelledSessions.includes(sessionId);
+                      const isReplaced = replacements[sessionId] && replacements[sessionId] !== '';
+                      const isProcessed = isCancelled || isReplaced;
+                      
+                      return (
+                        <tr key={session.sessionId ?? idx} className={isCancelled && approvalType === 'flexible' ? 'bg-red-50/30' : ''}>
+                          <td className="px-5 py-4 text-sm text-gray-500">
+                            {formatDateTime(session.sessionDate, session.startTime, session.endTime)}
+                          </td>
+                          <td className="px-5 py-4 text-sm font-medium text-gray-800">
+                            {session.subjectName}
+                          </td>
+                          <td className="px-5 py-4">
+                            {approvalType === 'full_leave' ? (
+                              <div className="text-gray-400 text-sm">Sẽ bị hủy</div>
+                            ) : isCancelled ? (
+                              <div className="flex items-center gap-2 text-red-600">
+                                <XCircle className="w-4 h-4" />
+                                <span className="text-sm">Đã hủy buổi học</span>
+                              </div>
                             ) : (
-                              (availableTeachersMap[String(session.sessionId)] || []).map((teacher) => (
-                                <option key={teacher.teacherId} value={String(teacher.teacherId)}>
-                                  {teacher.teacherName} ({teacher.teacherEmail})
-                                </option>
-                              ))
+                              <select
+                                value={replacements[sessionId] || ''}
+                                onChange={(e) => handleReplaceChange(sessionId, e.target.value)}
+                                onFocus={() => loadAvailableTeachers(sessionId)}
+                                className={`w-full bg-white border rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ${
+                                  isSubmitting || isCancelled
+                                    ? 'border-gray-200 bg-gray-50 text-gray-400'
+                                    : 'border-gray-200'
+                                }`}
+                                disabled={isSubmitting || isCancelled}
+                              >
+                                <option value="">Chọn giáo viên...</option>
+                                {loadingTeachers[sessionId] ? (
+                                  <option disabled>Đang tải...</option>
+                                ) : (
+                                  (availableTeachersMap[sessionId] || []).map((teacher) => (
+                                    <option key={teacher.teacherId} value={String(teacher.teacherId)}>
+                                      {teacher.teacherName} ({teacher.teacherEmail})
+                                    </option>
+                                  ))
+                                )}
+                              </select>
                             )}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          {approvalType === 'flexible' && (
+                            <td className="px-5 py-4 text-center">
+                              {!isSubmitting && (
+                                <button
+                                  onClick={() => handleCancelSession(sessionId)}
+                                  className={`p-2 rounded-lg transition-colors ${
+                                    isCancelled
+                                      ? 'text-green-600 hover:bg-green-50'
+                                      : 'text-red-500 hover:bg-red-50'
+                                  }`}
+                                  title={isCancelled ? 'Hủy bỏ việc hủy buổi học' : 'Hủy buổi học này'}
+                                >
+                                  {isCancelled ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                                </button>
+                              )}
+                              {isProcessed && !isSubmitting && (
+                                <span className="text-xs text-green-600 ml-2">
+                                  {isCancelled ? 'Đã hủy' : 'Đã chọn'}
+                                </span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -216,12 +281,9 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
               <div>
                 <p className="text-purple-800 text-sm font-bold">Gợi ý từ AI</p>
                 <p className="text-purple-700 text-sm leading-relaxed mt-0.5">
-                  Dựa trên lịch giảng dạy và chuyên môn, hệ thống đã gợi ý danh sách giáo viên có thể thay thế ở trên.
+                  Dựa trên lịch giảng dạy và chuyên môn, hệ thống đã gợi ý danh sách giáo viên có thể thay thế.
+                  {approvalType === 'flexible' && ' Bạn có thể chọn hủy buổi học nếu không tìm được người thay thế phù hợp.'}
                 </p>
-                <button className="mt-2 text-purple-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1 hover:underline">
-                  Xem chi tiết lịch trống
-                  <ChevronRight className="w-3 h-3" />
-                </button>
               </div>
             </div>
           </section>
@@ -231,10 +293,11 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
             <h3 className="text-lg font-bold text-gray-900">Phương án xử lý</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label
-                className={`relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${approvalType === 'full_leave'
-                  ? 'border-purple-500 bg-purple-50/30'
-                  : 'border-gray-200 bg-white hover:border-purple-300'
-                  }`}
+                className={`relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${
+                  approvalType === 'full_leave'
+                    ? 'border-purple-500 bg-purple-50/30'
+                    : 'border-gray-200 bg-white hover:border-purple-300'
+                }`}
               >
                 <input
                   type="radio"
@@ -245,34 +308,44 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                   className="absolute top-4 right-4 text-purple-600 focus:ring-purple-500"
                   disabled={isSubmitting}
                 />
-                <span className="font-bold text-gray-900">Nghỉ toàn bộ</span>
-                <span className="text-sm text-gray-500 mt-1">Hủy tất cả các tiết học trong thời gian xin nghỉ.</span>
+                <span className="font-bold text-gray-900">Hủy toàn bộ</span>
+                <span className="text-sm text-gray-500 mt-1">Hủy tất cả các buổi học trong thời gian xin nghỉ.</span>
               </label>
               <label
-                className={`relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${approvalType === 'replace'
-                  ? 'border-purple-500 bg-purple-50/30'
-                  : 'border-gray-200 bg-white hover:border-purple-300'
-                  }`}
+                className={`relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all ${
+                  approvalType === 'flexible'
+                    ? 'border-purple-500 bg-purple-50/30'
+                    : 'border-gray-200 bg-white hover:border-purple-300'
+                }`}
               >
                 <input
                   type="radio"
                   name="approval_type"
-                  value="replace"
-                  checked={approvalType === 'replace'}
-                  onChange={() => setApprovalType('replace')}
+                  value="flexible"
+                  checked={approvalType === 'flexible'}
+                  onChange={() => setApprovalType('flexible')}
                   className="absolute top-4 right-4 text-purple-600 focus:ring-purple-500"
                   disabled={isSubmitting}
                 />
-                <span className="font-bold text-gray-900">Có giáo viên thay thế</span>
-                <span className="text-sm text-gray-500 mt-1">Tiết học vẫn diễn ra với sự phụ trách của GV khác.</span>
+                <span className="font-bold text-gray-900">Xử lý linh hoạt</span>
+                <span className="text-sm text-gray-500 mt-1">Mỗi buổi học có thể chọn giáo viên thay thế hoặc hủy.</span>
               </label>
             </div>
 
-            {approvalType === 'replace' && isReplaceIncomplete && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-                <p className="text-sm text-red-700">
-                  Lưu ý: Bạn chưa chọn đủ giáo viên thay thế cho tất cả các buổi học bị ảnh hưởng.
+            {approvalType === 'flexible' && isFlexibleIncomplete && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <p className="text-sm text-amber-700">
+                  Còn {remainingSessions} buổi học chưa được xử lý. Vui lòng chọn thay thế hoặc hủy cho tất cả các buổi học.
+                </p>
+              </div>
+            )}
+
+            {approvalType === 'flexible' && processedSessions === totalSessions && totalSessions > 0 && !isFlexibleIncomplete && (
+              <div className="p-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <p className="text-sm text-green-700">
+                  Đã xử lý xong {processedSessions}/{totalSessions} buổi học. Bạn có thể tiến hành duyệt.
                 </p>
               </div>
             )}
@@ -293,7 +366,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
         </div>
 
         {/* Footer */}
-        <footer className="px-6 py-5 bg-gray-50 flex items-center justify-end gap-3 border-t border-gray-100">
+        <footer className="px-6 py-5 bg-gray-50 flex items-center justify-end gap-3 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={handleReject}
             disabled={isSubmitting}
@@ -303,8 +376,11 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={(approvalType === 'replace' && isReplaceIncomplete) || isSubmitting}
-            className="px-6 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={
+              isSubmitting ||
+              (approvalType === 'flexible' && isFlexibleIncomplete)
+            }
+            className="px-6 py-2 rounded-full btn-gradient from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Đang xử lý...' : 'Lưu xử lý'}
           </button>

@@ -73,35 +73,33 @@ const RoomPage = () => {
     }
   };
 
-  // Helper function để map status từ API sang UI
   const getRoomStatus = (room: RoomListDTO) => {
-    // manual override cao nhất
-    if (room.manualStatus === 'MAINTENANCE') {
-      return {
-        occupied: false,
-        available: false,
-        disabled: false,
-        maintenance: true,
-      };
+    switch(room.manualStatus) {
+        case 'MAINTENANCE':
+            return {
+                occupied: false,
+                available: false,
+                disabled: false,
+                maintenance: true,
+            };
+        case 'DISABLED':
+            return {
+                occupied: false,
+                available: false,
+                disabled: true,
+                maintenance: false,
+            };
+        case 'ACTIVE':
+        default:
+            // Khi manualStatus là ACTIVE, xem xét status thực tế
+            return {
+                occupied: room.status === 'ACTIVE',
+                available: room.status === 'DISABLED',
+                disabled: false,
+                maintenance: false,
+            };
     }
-
-    if (room.manualStatus === 'DISABLED') {
-      return {
-        occupied: false,
-        available: false,
-        disabled: true,
-        maintenance: false,
-      };
-    }
-
-    // manual ACTIVE => xét status thật
-    return {
-      occupied: room.status === 'ACTIVE',
-      available: room.status === 'DISABLED',
-      disabled: false,
-      maintenance: false,
-    };
-  };
+};
 
   // Helper function để map devices từ API
   const getDevices = (devices: Device[]) => {
@@ -236,8 +234,8 @@ const RoomPage = () => {
       setFormData({
         name: room.name,
         seatCapacity: room.seatCapacity,
-        manualStatus: room.manualStatus,
-        status: room.status,
+        manualStatus: room.manualStatus,  // Chỉ dùng manualStatus
+        // Không cần status riêng
         location: (room as any).location || '',
         devices: room.devices || []
       });
@@ -247,7 +245,6 @@ const RoomPage = () => {
         name: '',
         seatCapacity: 30,
         manualStatus: 'ACTIVE',
-        status: 'ACTIVE',
         location: '',
         devices: []
       });
@@ -290,112 +287,112 @@ const RoomPage = () => {
   };
 
   // Helper function để tạo DeviceUpdateDTO
-const getDeviceUpdates = (currentDevices: Device[], newDevices: Device[]): DeviceUpdateDTO[] => {
-  const updates: DeviceUpdateDTO[] = [];
-  
-  // Tìm devices cần xóa
-  const devicesToDelete = currentDevices.filter(
-    current => !newDevices.some(newDevice => newDevice.type === current.type)
-  );
-  
-  // Tìm devices cần thêm
-  const devicesToAdd = newDevices.filter(
-    newDevice => !currentDevices.some(current => current.type === newDevice.type)
-  );
-  
-  devicesToDelete.forEach(device => {
-    updates.push({
-      id: device.id,
-      type: device.type,
-      action: 'DELETE'
+  const getDeviceUpdates = (currentDevices: Device[], newDevices: Device[]): DeviceUpdateDTO[] => {
+    const updates: DeviceUpdateDTO[] = [];
+
+    // Tìm devices cần xóa
+    const devicesToDelete = currentDevices.filter(
+      current => !newDevices.some(newDevice => newDevice.type === current.type)
+    );
+
+    // Tìm devices cần thêm
+    const devicesToAdd = newDevices.filter(
+      newDevice => !currentDevices.some(current => current.type === newDevice.type)
+    );
+
+    devicesToDelete.forEach(device => {
+      updates.push({
+        id: device.id,
+        type: device.type,
+        action: 'DELETE'
+      });
     });
-  });
-  
-  devicesToAdd.forEach(device => {
-    updates.push({
-      id: null,
-      type: device.type,
-      action: 'ADD'
+
+    devicesToAdd.forEach(device => {
+      updates.push({
+        id: null,
+        type: device.type,
+        action: 'ADD'
+      });
     });
-  });
-  
-  return updates;
-};
+
+    return updates;
+  };
 
 
   const handleSaveRoom = async () => {
-  // Validate
-  if (!formData.name.trim()) {
-    alert('Vui lòng điền tên phòng học');
-    return;
-  }
-
-  if (formData.seatCapacity < 1) {
-    alert('Sức chứa phải lớn hơn 0');
-    return;
-  }
-
-  setSaving(true);
-  try {
-    // Chuẩn bị data cơ bản
-    const roomData: any = {
-      name: formData.name.trim(),
-      seatCapacity: formData.seatCapacity,
-      manualStatus: formData.manualStatus
-    };
-
-    if (editingRoom) {
-      // Lấy danh sách devices hiện tại
-      const currentDevicesResponse = await roomApi.getDevices(editingRoom.id);
-      const currentDevices = currentDevicesResponse.data || [];
-      
-      // Tạo device updates nếu có thay đổi
-      const deviceUpdates = getDeviceUpdates(currentDevices, formData.devices);
-      
-      if (deviceUpdates.length > 0) {
-        roomData.devices = deviceUpdates;
-      }
-      
-      // Gọi API update duy nhất, có thể có hoặc không có devices
-      const updateResponse = await roomApi.update(editingRoom.id, roomData);
-      
-      setAlert?.({
-        type: "success",
-        message: "Cập nhật phòng học thành công",
-      });
-    } else {
-      // THÊM MỚI
-      const createResponse = await roomApi.create(roomData);
-      const savedRoom = createResponse.data;
-
-      // Thêm devices cho phòng mới
-      if (savedRoom && formData.devices.length > 0) {
-        for (const device of formData.devices) {
-          await roomApi.addDevice(savedRoom.id, device.type);
-        }
-      }
-
-      setAlert?.({
-        type: "success",
-        message: "Thêm phòng học mới thành công",
-      });
+    // Validate
+    if (!formData.name.trim()) {
+      alert('Vui lòng điền tên phòng học');
+      return;
     }
 
-    // Refresh danh sách
-    await fetchRooms();
-    setIsModalOpen(false);
-    setEditingRoom(null);
-  } catch (err: any) {
-    console.error('Error saving room:', err);
-    const errorMessage = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu phòng học';
-    setAlert?.({
-      type: "error",
-      message: errorMessage,
-    });
-  } finally {
-    setSaving(false);
-  }
-};
+    if (formData.seatCapacity < 1) {
+      alert('Sức chứa phải lớn hơn 0');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Chuẩn bị data cơ bản - CHỈ gửi manualStatus
+      const roomData: any = {
+        name: formData.name.trim(),
+        seatCapacity: formData.seatCapacity,
+        manualStatus: formData.manualStatus  // Chỉ gửi manualStatus
+      };
+
+      if (editingRoom) {
+        // Lấy danh sách devices hiện tại
+        const currentDevicesResponse = await roomApi.getDevices(editingRoom.id);
+        const currentDevices = currentDevicesResponse.data || [];
+
+        // Tạo device updates nếu có thay đổi
+        const deviceUpdates = getDeviceUpdates(currentDevices, formData.devices);
+
+        if (deviceUpdates.length > 0) {
+          roomData.devices = deviceUpdates;
+        }
+
+        // Gọi API update
+        await roomApi.update(editingRoom.id, roomData);
+
+        setAlert?.({
+          type: "success",
+          message: "Cập nhật phòng học thành công",
+        });
+      } else {
+        // THÊM MỚI
+        const createResponse = await roomApi.create(roomData);
+        const savedRoom = createResponse.data;
+
+        // Thêm devices cho phòng mới
+        if (savedRoom && formData.devices.length > 0) {
+          for (const device of formData.devices) {
+            await roomApi.addDevice(savedRoom.id, device.type);
+          }
+        }
+
+        setAlert?.({
+          type: "success",
+          message: "Thêm phòng học mới thành công",
+        });
+      }
+
+      // Refresh danh sách
+      await fetchRooms();
+      setIsModalOpen(false);
+      setEditingRoom(null);
+    } catch (err: any) {
+      console.error('Error saving room:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu phòng học';
+      setAlert?.({
+        type: "error",
+        message: errorMessage,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDeleteRoom = async (id: number) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa phòng học này? Hành động này không thể hoàn tác.')) {

@@ -6,7 +6,8 @@ import type {
   StudentStatisticsGrade,
   StudentFilterParams,
   Student,
-  ParentContact
+  ParentContact,
+  LatestStudentsResponse
 } from '../types/student'
 
 // Interface cho response từ BE
@@ -230,6 +231,15 @@ export const studentApi = {
     }).then(res => res.data);
   },
 
+  async getLatestStudents(): Promise<Student[]> {
+    try {
+      const response = await axios.get('/students/latest') as LatestStudentsResponse;
+      return response.errCode === 0 ? response.data : [];
+    } catch (error: any) {
+      console.error('getLatestStudents error:', error);
+      return [];
+    }
+  }
 }
 
 
@@ -275,3 +285,5 @@ export const buildStudentFormData = (
 
   return formData;
 };
+
+

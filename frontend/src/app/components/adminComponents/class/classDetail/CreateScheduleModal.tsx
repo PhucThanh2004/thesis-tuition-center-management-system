@@ -1,5 +1,6 @@
 import { Calendar } from "lucide-react";
 import React, { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { roomApi } from "../../../../utils/api/room.api";
 import type { Room } from "../../../../utils/types/room";
 import { subjectScheduleApi } from "../../../../utils/api/subjectSchedule.api";
@@ -17,7 +18,7 @@ interface Errors {
   startDate?: string;
   endDate?: string;
   endTime?: string;
-   roomId?: string;
+  roomId?: string;
 }
 
 interface CreateScheduleModalProps {
@@ -26,11 +27,17 @@ interface CreateScheduleModalProps {
   onSuccess: () => void;
 }
 
+interface OutletContext {
+  setAlert?: (alert: { type: "success" | "error" | "info"; message: string }) => void;
+}
+
 export default function CreateScheduleModal({
   subjectId,
   onClose,
   onSuccess
 }: CreateScheduleModalProps) {
+  const { setAlert } = useOutletContext<OutletContext>();
+  
   const [formData, setFormData] = useState<FormData>({
     dayOfWeek: 1,
     startTime: "08:00",
@@ -51,55 +58,78 @@ export default function CreateScheduleModal({
         setRooms(res.data || [])
       } catch (err) {
         console.error("Lỗi khi fetch phòng học:", err)
+        setAlert?.({
+          type: "error",
+          message: "Không thể tải danh sách phòng học!",
+        });
       }
     }
 
     fetchRooms()
-  }, [])
+  }, [setAlert])
 
   const handleCreateSchedule = async (): Promise<void> => {
-  const { startDate, endDate, startTime, endTime, roomId, dayOfWeek } = formData;
-  const newErrors: Errors = {};
+    const { startDate, endDate, startTime, endTime, roomId, dayOfWeek } = formData;
+    const newErrors: Errors = {};
 
-  if (!startDate) newErrors.startDate = "Vui lòng chọn ngày bắt đầu!";
-  if (!endDate) newErrors.endDate = "Vui lòng chọn ngày kết thúc!";
-  if (endTime <= startTime) newErrors.endTime = "Giờ kết thúc phải sau giờ bắt đầu!";
-  if (!roomId) newErrors.roomId = "Vui lòng chọn phòng!";
+    if (!startDate) newErrors.startDate = "Vui lòng chọn ngày bắt đầu!";
+    if (!endDate) newErrors.endDate = "Vui lòng chọn ngày kết thúc!";
+    if (endTime <= startTime) newErrors.endTime = "Giờ kết thúc phải sau giờ bắt đầu!";
+    if (!roomId) newErrors.roomId = "Vui lòng chọn phòng!";
 
-  if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (end < start) newErrors.endDate = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu!";
-  }
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end < start) newErrors.endDate = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu!";
+    }
 
-  setErrors(newErrors);
-  if (Object.keys(newErrors).length > 0) return;
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
-  setLoading(true);
-  try {
-    const res = await subjectScheduleApi.create({
-      subjectId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      roomId,
-      startDate,
-      endDate
-    });
+    setLoading(true);
+    try {
+      const res = await subjectScheduleApi.create({
+        subjectId,
+        dayOfWeek,
+        startTime,
+        endTime,
+        roomId,
+        startDate,
+        endDate
+      });
 
-    alert(res.message || "Tạo lịch học thành công!");
-    onSuccess();
-    onClose();
-  } catch (error: any) {
-    const msg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Có lỗi xảy ra khi tạo lịch học!";
-    alert(msg);
-  } finally {
-    setLoading(false);
-  }
-};
+      setAlert?.({
+        type: "success",
+        message: res.message || "Tạo lịch học thành công!",
+      });
+      
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Có lỗi xảy ra khi tạo lịch học!";
+      
+      setAlert?.({
+        type: "error",
+        message: msg,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Hàm đóng modal khi nhấn ESC
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   return (
     <>
@@ -232,7 +262,7 @@ export default function CreateScheduleModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Phòng học
+                Phòng học <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.roomId ?? ""}
@@ -251,6 +281,12 @@ export default function CreateScheduleModal({
                   </option>
                 ))}
               </select>
+              {errors.roomId && (
+                <div className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                  <span className="inline-block w-1 h-1 rounded-full bg-red-500"></span>
+                  {errors.roomId}
+                </div>
+              )}
             </div>
 
             {/* Thông tin bổ sung */}

@@ -22,11 +22,16 @@ import {
 } from "lucide-react";
 import { sessionApi } from "../../../../utils/api";
 import type { SessionDetail, SessionOfSubject } from "../../../../utils/types/session";
-import type { AttendanceToday } from "../../../../utils/types/attendance";
-import { attendanceApi } from "../../../../utils/api/attendance.api";
 import CreateScheduleModal from "./CreateScheduleModal";
 import CreateSessionModal from "./CreateSessionModal";
 import type { Subject } from "../../../../utils/types/subject";
+import { subjectScheduleApi } from "../../../../utils/api/subjectSchedule.api";
+import { useOutletContext } from "react-router-dom";
+
+// Thêm interface cho context
+interface OutletContext {
+  setAlert?: (alert: { type: "success" | "error" | "info"; message: string }) => void;
+}
 
 // ============================================================================
 // Constants & Utilities - Vietnamese
@@ -460,6 +465,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
   onCancelSession,
   isTeacher = false,
 }) => {
+  const { setAlert } = useOutletContext<OutletContext>();
   const [sessions, setSessions] = useState<SessionOfSubject[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionOfSubject | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -470,16 +476,17 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionOfSubject | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  
+
   // State for session detail from API
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
 
   if (!subject) return null;
   const SUBJECT_ID = subject.id;
 
   // Fetch sessions
-  useEffect(() => {
+   useEffect(() => {
     const fetchSchedule = async () => {
       try {
         setLoading(true);
@@ -487,14 +494,18 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
         setSessions(res.sessions);
       } catch (err) {
         console.error("Không thể tải danh sách buổi học:", err);
+        setAlert?.({
+          type: "error",
+          message: "Không thể tải danh sách buổi học!",
+        });
       } finally {
         setLoading(false);
       }
     };
     fetchSchedule();
-  }, [SUBJECT_ID]);
+  }, [SUBJECT_ID, setAlert]);
 
-  // Fetch session detail when selected session changes
+ // Fetch session detail với error handling
   useEffect(() => {
     if (!selectedSession?.id) {
       setSessionDetail(null);
@@ -508,6 +519,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
         setSessionDetail(detail);
       } catch (err) {
         console.error("Không thể tải chi tiết buổi học:", err);
+        setAlert?.({
+          type: "error",
+          message: "Không thể tải chi tiết buổi học!",
+        });
         setSessionDetail(null);
       } finally {
         setLoadingDetail(false);
@@ -515,8 +530,52 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
     };
 
     fetchSessionDetail();
-  }, [selectedSession?.id]);
+  }, [selectedSession?.id, setAlert]);
 
+  const handleDeleteSession = useCallback(async () => {
+    if (!selectedSession) return;
+
+    const confirmDelete = window.confirm(
+      `Bạn có chắc chắn muốn xóa buổi học ngày ${new Date(selectedSession.sessionDate).toLocaleDateString("vi-VN")}?`
+    );
+
+    if (!confirmDelete) return;
+
+    setDeletingSession(true);
+    try {
+      const res = await subjectScheduleApi.deleteSession(selectedSession.id);
+
+      if (res?.success === false) {
+        setAlert?.({
+          type: "error",
+          message: res.message || "Có lỗi xảy ra khi xóa buổi học!",
+        });
+        return;
+      }
+
+      setAlert?.({
+        type: "success",
+        message: res?.message || "Xóa buổi học thành công!",
+      });
+
+      // Refresh danh sách buổi học
+      const updatedSessions = await sessionApi.getScheduleBySubject(SUBJECT_ID);
+      setSessions(updatedSessions.sessions);
+
+      // Clear selected session
+      setSelectedSession(null);
+      setSelectedDate(null);
+    } catch (error: any) {
+      console.error("Lỗi khi xóa buổi học:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Có lỗi xảy ra khi xóa buổi học!";
+      setAlert?.({
+        type: "error",
+        message: errorMessage,
+      });
+    } finally {
+      setDeletingSession(false);
+    }
+  }, [selectedSession, SUBJECT_ID, setAlert]);
   // Auto-select today's session
   useEffect(() => {
     if (!sessions.length) return;
@@ -582,13 +641,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
     if (!sessionDetail) {
       return { present: 0, late: 0, absent: 0, total: 0, attendanceRate: 0 };
     }
-    
+
     const present = sessionDetail.studentAttendances.filter(s => s.attendanceStatus === 'present').length;
     const late = sessionDetail.studentAttendances.filter(s => s.attendanceStatus === 'late').length;
     const absent = sessionDetail.studentAttendances.filter(s => s.attendanceStatus === 'absent').length;
     const total = present + late + absent;
     const attendanceRate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    
+
     return { present, late, absent, total, attendanceRate };
   }, [sessionDetail]);
 
@@ -610,18 +669,38 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
       setLoading(true);
       const res = await sessionApi.getScheduleBySubject(SUBJECT_ID);
       setSessions(res.sessions);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }, [SUBJECT_ID]);
+      setAlert?.({
+        type: "success",
+        message: "Tạo lịch học thành công!",
+      });
+    } catch (err) { 
+      console.error(err); 
+      setAlert?.({
+        type: "error",
+        message: "Có lỗi xảy ra khi tải lại danh sách buổi học!",
+      });
+    } finally { 
+      setLoading(false); 
+    }
+  }, [SUBJECT_ID, setAlert]);
 
   const handleOpenSessionModal = () => { setEditingSession(null); setShowSessionModal(true); };
   const handleCloseSessionModal = () => { setShowSessionModal(false); setEditingSession(null); };
-  const handleSessionSuccess = useCallback(async () => {
+   const handleSessionSuccess = useCallback(async () => {
     try {
       setLoading(true);
       const res = await sessionApi.getScheduleBySubject(SUBJECT_ID);
       setSessions(res.sessions);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }, [SUBJECT_ID]);
+    } catch (err) { 
+      console.error(err); 
+      setAlert?.({
+        type: "error",
+        message: "Có lỗi xảy ra khi tải lại danh sách buổi học!",
+      });
+    } finally { 
+      setLoading(false); 
+    }
+  }, [SUBJECT_ID, setAlert]);
 
   const handleEditSession = () => { if (selectedSession) { setEditingSession(selectedSession); setShowSessionModal(true); } };
 
@@ -637,11 +716,11 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
             <StatCard label="Tổng buổi học" value={stats.total} icon={Calendar} color="indigo" />
             <StatCard label="Đã hoàn thành" value={stats.completed} icon={CheckCircle} color="emerald" />
             <StatCard label="Sắp tới" value={stats.upcoming} icon={Clock} color="amber" />
-            <StatCard 
-              label="Tỷ lệ chuyên cần" 
-              value={attendanceStats.attendanceRate} 
-              icon={UserCheck} 
-              color="violet" 
+            <StatCard
+              label="Tỷ lệ chuyên cần"
+              value={attendanceStats.attendanceRate}
+              icon={UserCheck}
+              color="violet"
             />
           </div>
         </motion.div>
@@ -860,6 +939,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                     </div>
 
                     {/* Action Buttons */}
+                    {/* Action Buttons */}
                     <div className="space-y-3 pt-2">
                       <motion.button
                         whileHover={{ scale: 1.01 }}
@@ -894,10 +974,16 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                           <motion.button
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={onCancelSession}
-                            className="w-full py-2 text-rose-500 text-sm font-medium hover:text-rose-600 transition-all flex items-center justify-center gap-2"
+                            onClick={handleDeleteSession}
+                            disabled={deletingSession}
+                            className="w-full py-2 text-rose-500 text-sm font-medium hover:text-rose-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Trash2 size={16} /> Hủy buổi học
+                            {deletingSession ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-rose-500 border-t-transparent" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                            {deletingSession ? "Đang xóa..." : "Xóa buổi học"}
                           </motion.button>
                         </>
                       )}

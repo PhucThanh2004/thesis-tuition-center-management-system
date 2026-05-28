@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Plus } from "lucide-react";
+import { Calendar } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
 import { roomApi } from "../../../../utils/api/room.api";
 import type { Room } from "../../../../utils/types/room";
+import type { AddManualSessionRequest, UpdateSessionRequest } from "../../../../utils/types/subjectSchedule";
+import { subjectScheduleApi } from "../../../../utils/api/subjectSchedule.api";
 
 interface SessionData {
   sessionDate: string;
   startTime: string;
   endTime: string;
   roomId: number | null;
-status: string;
+  status: string;
 }
 
 interface Errors {
@@ -26,27 +29,9 @@ interface CreateSessionModalProps {
   sessionId?: number;
 }
 
-// Mock API - sẽ thay bằng API thật sau
-const createSessionApi = async (data: any): Promise<any> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  console.log("Tạo buổi học mới:", data);
-  return {
-    success: true,
-    message: "Tạo buổi học thành công!",
-    data: { id: Math.floor(Math.random() * 1000), ...data }
-  };
-};
-
-// Mock API - sẽ thay bằng API thật sau
-const updateSessionApi = async (id: number, data: any): Promise<any> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  console.log("Cập nhật buổi học:", id, data);
-  return {
-    success: true,
-    message: "Cập nhật buổi học thành công!",
-    data: { id, ...data }
-  };
-};
+interface OutletContext {
+  setAlert?: (alert: { type: "success" | "error" | "info"; message: string }) => void;
+}
 
 export default function CreateSessionModal({
   subjectId,
@@ -56,6 +41,8 @@ export default function CreateSessionModal({
   isEdit = false,
   sessionId,
 }: CreateSessionModalProps) {
+  const { setAlert } = useOutletContext<OutletContext>();
+  
   const [formData, setFormData] = useState<SessionData>({
     sessionDate: "",
     startTime: "08:00",
@@ -77,13 +64,17 @@ export default function CreateSessionModal({
         setRooms(res.data || []);
       } catch (err) {
         console.error("Lỗi khi tải danh sách phòng:", err);
+        setAlert?.({
+          type: "error",
+          message: "Không thể tải danh sách phòng học!",
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchRooms();
-  }, []);
+  }, [setAlert]);
 
   useEffect(() => {
     if (initialData) {
@@ -97,9 +88,8 @@ export default function CreateSessionModal({
     }
   }, [initialData]);
 
-  const handleSubmit = async (): Promise<void> => {
+  const validateForm = (): boolean => {
     const { sessionDate, startTime, endTime } = formData;
-
     const newErrors: Errors = {};
 
     if (!sessionDate) newErrors.sessionDate = "Vui lòng chọn ngày học!";
@@ -116,31 +106,73 @@ export default function CreateSessionModal({
     }
 
     setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    if (Object.keys(newErrors).length > 0) return;
+  const handleSubmit = async (): Promise<void> => {
+    if (!validateForm()) return;
 
     setSubmitting(true);
     try {
       let res;
       if (isEdit && sessionId) {
-        res = await updateSessionApi(sessionId, formData);
+        // Cập nhật buổi học
+        const updateData: UpdateSessionRequest = {
+          sessionDate: formData.sessionDate,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          roomId: formData.roomId,
+          status: formData.status,
+        };
+        res = await subjectScheduleApi.updateSession(sessionId, updateData);
+
+        if (res?.success === false) {
+          setAlert?.({
+            type: "error",
+            message: res.message || "Có lỗi xảy ra khi cập nhật buổi học!",
+          });
+          return;
+        }
+
+        setAlert?.({
+          type: "success",
+          message: res?.message || "Cập nhật buổi học thành công!",
+        });
       } else {
-        res = await createSessionApi({ subjectId, ...formData });
-      }
+        // Thêm buổi học mới
+        const addData: AddManualSessionRequest = {
+          subjectId: subjectId,
+          sessionDate: formData.sessionDate,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          roomId: formData.roomId,
+          status: formData.status,
+        };
+        res = await subjectScheduleApi.addManualSession(addData);
 
-      if (res?.success === false || res?.error) {
-        const msg = res?.error || res?.message || "Có lỗi xảy ra khi lưu buổi học!";
-        alert(msg);
-        return;
-      }
+        if (res?.success === false) {
+          setAlert?.({
+            type: "error",
+            message: res.message || "Có lỗi xảy ra khi tạo buổi học!",
+          });
+          return;
+        }
 
-      alert(res?.message || (isEdit ? "Cập nhật buổi học thành công!" : "Tạo buổi học thành công!"));
+        setAlert?.({
+          type: "success",
+          message: res?.message || "Tạo buổi học thành công!",
+        });
+      }
 
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Lỗi khi lưu session:", error);
-      alert("Có lỗi xảy ra khi lưu buổi học!");
+      const errorMessage = error?.response?.data?.message || error?.message || "Có lỗi xảy ra khi lưu buổi học!";
+      setAlert?.({
+        type: "error",
+        message: errorMessage,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -153,22 +185,18 @@ export default function CreateSessionModal({
           scrollbar-width: thin;
           scrollbar-color: #c1c1c1 #f1f1f1;
         }
-
         .scrollbar-custom::-webkit-scrollbar {
           width: 8px;
         }
-
         .scrollbar-custom::-webkit-scrollbar-track {
           background: #f1f1f1;
           border-radius: 8px;
         }
-
         .scrollbar-custom::-webkit-scrollbar-thumb {
           background-color: #c1c1c1;
           border-radius: 8px;
           border: 2px solid #f1f1f1;
         }
-
         .scrollbar-custom::-webkit-scrollbar-thumb:hover {
           background-color: #a8a8a8;
         }
@@ -292,7 +320,7 @@ export default function CreateSessionModal({
                   >
                     <option value="scheduled">Đã lên lịch</option>
                     <option value="completed">Đã hoàn thành</option>
-                    <option value="cancelled">Đã hủy</option>
+                    <option value="canceled">Đã hủy</option>
                   </select>
                 </div>
 

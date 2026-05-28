@@ -151,3 +151,9 @@ export const getFullAddress = (address: Address | null): string => {
 export const formatDateOfBirth = (dateOfBirth: string): string => {
   return new Date(dateOfBirth).toLocaleDateString('vi-VN')
 }
+
+export interface LatestStudentsResponse {
+  errCode: number;
+  message: string;
+  data: Student[];  
+}

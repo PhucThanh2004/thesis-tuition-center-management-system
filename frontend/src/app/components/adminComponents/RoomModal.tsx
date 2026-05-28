@@ -146,14 +146,10 @@ const RoomModal: React.FC<RoomModalProps> = ({
                                     Trạng thái
                                 </label>
                                 <select
-                                    value={formData.manualStatus || formData.status}
-                                    onChange={(e) => {
-                                        onFormChange('manualStatus', e.target.value);
-                                        onFormChange('status', e.target.value);
-                                    }}
+                                    value={formData.manualStatus || 'ACTIVE'} 
+                                    onChange={(e) => onFormChange('manualStatus', e.target.value)}  
                                     disabled={saving}
-                                    className="w-full px-4 py-2.5 rounded-2xl border border-gray-200
-                             focus:ring-2 focus:ring-gray-300 transition outline-none"
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-gray-300 transition outline-none"
                                 >
                                     <option value="ACTIVE">Hoạt động</option>
                                     <option value="DISABLED">Vô hiệu hóa</option>
@@ -193,8 +189,8 @@ const RoomModal: React.FC<RoomModalProps> = ({
                                         <Icon
                                             size={18}
                                             className={`${isSelected
-                                                    ? 'text-gray-800'
-                                                    : 'text-gray-400 group-hover:text-gray-600'
+                                                ? 'text-gray-800'
+                                                : 'text-gray-400 group-hover:text-gray-600'
                                                 }`}
                                         />
 

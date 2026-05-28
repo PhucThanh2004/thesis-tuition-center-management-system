@@ -3,11 +3,13 @@ import { BookOpen, Menu, X, Bell, Settings, MessageSquare, User, LogOut, Chevron
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getImageSrc, getInitials, getRoleName } from "../../utils/helpers";
+import type { ActivityLog } from '../../utils/types/activity-log';
+import { activityLogApi } from '../../utils/api/activity-log.api';
 
 const NAV_LINKS = [
   { label: 'Trang chủ', path: '/admin/home' },
   { label: 'Học sinh', path: '/admin/student' },
-   {
+  {
     label: 'Giáo viên',
     path: '#',
     children: [
@@ -32,6 +34,7 @@ const NAV_LINKS = [
 
 export function EduHeader() {
   const { user, logout } = useAuth();
+  
   const navigate = useNavigate();
   const location = useLocation();
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -39,8 +42,10 @@ export function EduHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [activities, setActivities] = useState<ActivityLog[]>([])
+  const [loading, setLoading] = useState(false); // Thêm loading state
 
-  // 2. Xử lý đóng User Menu khi click ra ngoài
+  // Xử lý đóng User Menu khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -51,12 +56,60 @@ export function EduHeader() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 3. Tối ưu scroll listener
+  // Tối ưu scroll listener
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // 🟢 THÊM: Helper function để parse meta an toàn
+  const getMetaSafe = (metaString: string | null) => {
+    if (!metaString) return null;
+    try {
+      return JSON.parse(metaString);
+    } catch (error) {
+      console.warn('Failed to parse meta JSON:', metaString);
+      return null;
+    }
+  };
+
+  // 🟢 THÊM: Format time relative (giống TeacherHeader)
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  };
+
+  // Fetch activities cho admin
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        if (!user) return;
+
+        setLoading(true);
+        // Gọi API đúng cho admin
+        const data = await activityLogApi.getRecentActivities(10);
+        setActivities(data);
+
+      } catch (err) {
+        console.error('Error fetching activities:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchActivities()
+  }, [user])
 
   const handleLogout = useCallback(() => {
     logout();
@@ -135,51 +188,90 @@ export function EduHeader() {
                 <Bell className="w-5 h-6 transition-transform group-hover:rotate-[15deg]" />
 
                 {/* Badge số lượng thông báo */}
-                <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 text-[8px] text-white font-semibold items-center justify-center">
-                    3
+                {activities.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 text-[8px] text-white font-semibold items-center justify-center">
+                      {activities.length > 99 ? '99+' : activities.length}
+                    </span>
                   </span>
-                </span>
+                )}
               </button>
 
-              {/* Dropdown xem nhanh (Hiện khi hover hoặc click tùy bạn chọn) */}
+              {/* Dropdown xem nhanh */}
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-50">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-gray-900">Thông báo</h3>
+                  <h3 className="font-bold text-gray-900">Thông báo hoạt động</h3>
                   <button className="text-xs text-[#667eea] hover:underline font-medium">Đánh dấu đã đọc</button>
                 </div>
 
                 <div className="max-h-[300px] overflow-y-auto">
-                  {/* Ví dụ 1 item thông báo */}
-                  <div className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 border-b border-gray-50">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
-                      <MessageSquare className="w-5 h-5 text-blue-600" />
+                  {loading ? (
+                    // Hiển thị loading
+                    <div className="p-8 text-center">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+                      <p className="text-sm text-gray-400 mt-2">Đang tải...</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800 line-clamp-2">
-                        <span className="font-bold">Hệ thống:</span> Lịch học lớp ReactJS đã được cập nhật vào thứ 2 tuần tới.
-                      </p>
-                      <span className="text-[11px] text-gray-400 mt-1 block">2 phút trước</span>
+                  ) : activities.length === 0 ? (
+                    // Không có thông báo
+                    <div className="p-8 text-center">
+                      <Bell className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400">Chưa có hoạt động nào</p>
                     </div>
-                  </div>
+                  ) : (
+                    activities.map(activity => {
+                      const meta = getMetaSafe(activity.meta); // Sử dụng hàm parse an toàn
+                      const isCurrentUser = activity.userId === user?.id;
 
-                  <div className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex-shrink-0 flex items-center justify-center">
-                      <User className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-800 line-clamp-2">
-                        <span className="font-bold">Cô Mai:</span> Đã phê duyệt yêu cầu nghỉ học của bạn.
-                      </p>
-                      <span className="text-[11px] text-gray-400 mt-1 block">1 giờ trước</span>
-                    </div>
-                  </div>
+                      return (
+                        <div
+                          key={activity.id}
+                          className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 border-b border-gray-50"
+                        >
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                            {activity.userImage ? (
+                              <img
+                                src={getImageSrc(activity.userImage)}
+                                className="w-full h-full object-cover"
+                                alt=""
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                                {getInitials(activity.userName)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800">
+                              <span className="font-bold">
+                                {isCurrentUser ? 'Bạn' : activity.userName}
+                              </span>
+                              {' '}{activity.description}
+                            </p>
+
+                            {meta?.title && (
+                              <p className="text-xs text-indigo-500 mt-1 font-medium truncate">
+                                📌 {meta.title}
+                              </p>
+                            )}
+
+                            {/* 🟢 THAY ĐỔI: Sử dụng formatRelativeTime giống TeacherHeader */}
+                            <span className="text-[11px] text-gray-400 mt-1 block">
+                              {formatRelativeTime(activity.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 <button
                   onClick={() => navigate('/admin/announcement')}
-                  className="w-full p-3 text-center text-sm font-semibold text-gray-600 hover:text-[#667eea] border-t border-gray-100"
+                  className="w-full p-3 text-center text-sm font-semibold text-gray-600 hover:text-[#667eea] border-t border-gray-100 transition-colors"
                 >
                   Xem tất cả thông báo
                 </button>
@@ -190,10 +282,8 @@ export function EduHeader() {
 
             {/* User menu Container */}
             <div className="relative" ref={userMenuRef}>
-              {/* 1. Nút kích hoạt (Trigger) - Thiết kế theo image_4a90e9.png */}
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                /* Chỉnh lại: pr-2 (giảm padding phải), gap-1.5 (khoảng cách giữa avatar và icon) */
                 className="flex items-center gap-1.5 p-1 pr-2 rounded-full hover:bg-gray-50 transition-all duration-200 border border-transparent hover:border-gray-100 group"
               >
                 {/* Avatar */}
@@ -204,7 +294,6 @@ export function EduHeader() {
                       src={getImageSrc(user.image) || ''}
                       alt={user.fullName}
                       className="w-full h-full rounded-full object-cover"
-                      // Xử lý nếu link ảnh lỗi (ví dụ 404) thì ẩn ảnh hiện chữ cái
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).parentElement!.classList.add('bg-indigo-600');
@@ -219,18 +308,16 @@ export function EduHeader() {
                   )}
                 </div>
 
-                {/* Icon mũi tên - Loại bỏ div bọc không cần thiết để dễ căn chỉnh */}
+                {/* Icon mũi tên */}
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${showUserMenu ? 'rotate-180' : 'showUserMenu text-indigo-500'
+                  className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${showUserMenu ? 'rotate-180' : ''
                     }`}
                 />
               </button>
 
-              {/* 2. Menu thả xuống (Dropdown) */}
+              {/* User Dropdown Menu */}
               {showUserMenu && (
                 <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-gray-100 py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right z-[60]">
-
-                  {/* Header: Thông tin chi tiết */}
                   <div className="px-4 py-3 mb-2 border-b border-gray-50">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 mb-1">
                       {user?.roleId && getRoleName(user.roleId)}
@@ -239,7 +326,6 @@ export function EduHeader() {
                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                   </div>
 
-                  {/* Danh sách lựa chọn */}
                   <div className="space-y-0.5 px-2">
                     <MenuAction
                       icon={<User className="w-4 h-4" />}
@@ -255,7 +341,6 @@ export function EduHeader() {
 
                   <div className="my-2 border-t border-gray-50" />
 
-                  {/* Nút Đăng xuất */}
                   <div className="px-2">
                     <button
                       onClick={handleLogout}
@@ -296,7 +381,6 @@ export function EduHeader() {
                   {link.label}
                 </button>
 
-                {/* Render mục con ngay bên dưới nếu có */}
                 {link.children && (
                   <div className="ml-4 mt-1 border-l-2 border-indigo-100">
                     {link.children.map((child) => (

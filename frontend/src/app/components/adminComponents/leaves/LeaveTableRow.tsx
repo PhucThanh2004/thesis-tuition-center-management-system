@@ -1,17 +1,15 @@
-// src/app/components/leaves/LeaveTableRow.tsx
-
+// src/app/components/adminComponents/leaves/LeaveTableRow.tsx
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Check,
   X,
-  MoreVertical,
   Mail,
   Calendar,
   Clock,
   User,
   Eye
 } from 'lucide-react';
-
 import type { LeaveRequest } from '../../../utils/types/teacherLeave';
 
 interface LeaveTableRowProps {
@@ -31,17 +29,18 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
   onReject,
   onViewDetail,
 }) => {
+  const navigate = useNavigate();
 
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'Chờ duyệt':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-amber-50 text-amber-700';
       case 'Đã duyệt':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-50 text-emerald-700';
       case 'Từ chối':
-        return 'bg-red-50 text-red-700 border-red-200';
+        return 'bg-red-50 text-red-700';
       default:
-        return 'bg-gray-50 text-gray-600 border-gray-200';
+        return 'bg-gray-50 text-gray-600';
     }
   };
 
@@ -65,159 +64,132 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
       case 'Nghỉ ốm':
         return 'bg-purple-50 text-purple-700';
       case 'Việc riêng':
-        return 'bg-orange-50 text-orange-700';
+        return 'bg-orange-50 text-orange-600';
       default:
         return 'bg-gray-50 text-gray-600';
     }
   };
 
-  const handleCheckboxChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    onSelect(leave.id, e.target.checked);
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('vi-VN');
   };
 
-  const handleApproveClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onApprove(leave.id);
+  const calculateDays = () => {
+    if (leave.days) return leave.days;
+    if (leave.startDate && leave.endDate) {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays + 1;
+    }
+    return 1;
   };
 
-  const handleRejectClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onReject(leave.id);
+  const handleRowClick = () => {
+    console.log('Row clicked, navigating to:', `/admin/teacher/leave/${leave.id}`);
+    navigate(`/admin/teacher/leave/${leave.id}`);
   };
 
-  const handleViewDetailClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onViewDetail?.(leave.id);
-  };
-
+  // Component này trả về các td, KHÔNG phải tr
   return (
-    <tr
-      onClick={() => onViewDetail?.(leave.id)}
-      className="hover:bg-gray-50 transition-colors cursor-pointer"
-    >
-      <td
-        className="p-5 text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <>
+      {/* Checkbox */}
+      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={isSelected}
-          onChange={handleCheckboxChange}
-          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          onChange={(e) => onSelect(leave.id, e.target.checked)}
+          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
         />
       </td>
 
-      <td className="p-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center">
-            <User className="w-5 h-5 text-purple-600" />
+      {/* Giáo viên */}
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <div className="flex items-center gap-3 cursor-pointer">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+            <User className="w-4 h-4 text-purple-600" />
           </div>
-
           <div>
-            <p className="font-semibold text-gray-900">
-              {leave.teacherName}
-            </p>
-
-            <div className="flex items-center gap-2 mt-0.5">
-              <Mail className="w-3 h-3 text-gray-400" />
-
-              <p className="text-xs text-gray-500">
-                {leave.department}
-              </p>
-            </div>
+            <p className="font-semibold text-gray-800 text-sm">{leave.teacherName}</p>
+            <p className="text-xs text-gray-400">{leave.department}</p>
           </div>
         </div>
       </td>
 
-      <td className="p-5 text-gray-600 font-medium">
+      {/* Mã GV */}
+      <td className="px-4 py-3 text-gray-500 text-sm" onClick={handleRowClick}>
         {leave.teacherCode}
       </td>
 
-      <td className="p-5">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-medium ${getLeaveTypeStyle(
-            leave.leaveType
-          )}`}
-        >
+      {/* Loại nghỉ */}
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeStyle(leave.leaveType)}`}>
           {leave.leaveType}
         </span>
       </td>
 
-      <td className="p-5 text-gray-700 font-medium">
-        <div className="flex items-center gap-1">
-          <Calendar className="w-3.5 h-3.5 text-gray-400" />
-          {leave.startDate}
-          {leave.endDate && ` - ${leave.endDate}`}
-        </div>
+      {/* Ngày nghỉ */}
+      <td className="px-4 py-3 text-gray-600 text-sm" onClick={handleRowClick}>
+        {formatDate(leave.startDate)}
+        {leave.endDate && leave.endDate !== leave.startDate && ` → ${formatDate(leave.endDate)}`}
       </td>
 
-      <td className="p-5 text-gray-700 font-medium">
-        <div className="flex items-center gap-1">
-          <Clock className="w-3.5 h-3.5 text-gray-400" />
-          {leave.days} ngày
-        </div>
+      {/* Số ngày */}
+      <td className="px-4 py-3 text-gray-600 text-sm" onClick={handleRowClick}>
+        {calculateDays()} ngày
       </td>
 
-      <td className="p-5">
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(
-            leave.status
-          )}`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${getStatusDot(
-              leave.status
-            )}`}
-          ></span>
-
+      {/* Trạng thái */}
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(leave.status)}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(leave.status)}`} />
           {leave.status}
         </span>
       </td>
 
-      <td
-        className="p-5 text-right"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-end gap-2">
-          {leave.status === 'Chờ duyệt' && (
+      {/* Hành động */}
+      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end gap-1">
+          {leave.status === 'Chờ duyệt' ? (
             <>
               <button
-                onClick={handleApproveClick}
-                className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApprove(leave.id);
+                }}
+                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
                 title="Duyệt"
               >
-                <Check className="w-5 h-5" />
+                <Check className="w-4 h-4" />
               </button>
-
               <button
-                onClick={handleRejectClick}
-                className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReject(leave.id);
+                }}
+                className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                 title="Từ chối"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </>
-          )}
-
-          {leave.status !== 'Chờ duyệt' && (
-            <>
-              <button
-                onClick={handleViewDetailClick}
-                className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                title="Xem chi tiết"
-              >
-                <Eye className="w-5 h-5" />
-              </button>
-
-              <button className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
-                <MoreVertical className="w-5 h-5" />
-              </button>
-            </>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetail?.(leave.id);
+              }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+              title="Chi tiết"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
           )}
         </div>
       </td>
-    </tr>
+    </>
   );
 };

@@ -1,16 +1,31 @@
-// src/app/components/leaves/LeaveStats.tsx
+// src/app/components/adminComponents/leaves/LeaveStats.tsx
 import React from 'react';
+import { motion } from 'framer-motion';
 import { LayoutDashboard, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 interface LeaveStatItem {
   title: string;
   value: number;
-  icon: string; // dashboard, pending_actions, check_circle, cancel
+  icon: string;
 }
 
 interface LeaveStatsProps {
   stats: LeaveStatItem[];
 }
+
+// Animation variants - không gán type
+const statCardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (index: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: index * 0.1, duration: 0.4 },
+  }),
+  hover: {
+    y: -4,
+    transition: { duration: 0.2 },
+  },
+};
 
 export const LeaveStats: React.FC<LeaveStatsProps> = ({ stats }) => {
   const getIcon = (iconName: string) => {
@@ -36,20 +51,51 @@ export const LeaveStats: React.FC<LeaveStatsProps> = ({ stats }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat, idx) => (
-        <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <motion.div
+          key={idx}
+          custom={idx}
+          variants={statCardVariants}
+          initial="hidden"
+          animate="visible"
+          whileHover="hover"
+          className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-4">
-            <div className={`p-3 rounded-xl ${getIconBg(stat.icon)}`}>
+            <motion.div 
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              className={`p-3 rounded-xl ${getIconBg(stat.icon)}`}
+            >
               {getIcon(stat.icon)}
-            </div>
+            </motion.div>
             {stat.title === 'Tổng đơn' && (
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+              <motion.span 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: "spring" }}
+                className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"
+              >
                 +12%
-              </span>
+              </motion.span>
             )}
           </div>
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{stat.title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-        </div>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 + idx * 0.05 }}
+            className="text-sm font-medium text-gray-500 uppercase tracking-wider"
+          >
+            {stat.title}
+          </motion.p>
+          <motion.p 
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2 + idx * 0.05, type: "spring" }}
+            className="text-2xl font-bold text-gray-900 mt-1"
+          >
+            {stat.value}
+          </motion.p>
+        </motion.div>
       ))}
     </div>
   );

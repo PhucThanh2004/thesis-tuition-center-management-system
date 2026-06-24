@@ -1,29 +1,43 @@
 // src/app/components/leaves/LeaveHeader.tsx
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Plus, CalendarDays } from 'lucide-react';
 
 interface LeaveHeaderProps {
   onCreateRequest: () => void;
 }
 
+const headerVariants = {
+  hidden: { opacity: 0, y: -10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+};
+
+const buttonVariants = {
+  hover: { scale: 1.02, transition: { duration: 0.2 } },
+  tap: { scale: 0.98, transition: { duration: 0.1 } },
+};
+
 export const LeaveHeader: React.FC<LeaveHeaderProps> = ({ onCreateRequest }) => {
   return (
-    <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-      <div className="space-y-2">
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 font-headline">
-          Quản lý lịch nghỉ giáo viên
-        </h1>
-        <p className="text-gray-500 font-medium">
-          Hệ thống phê duyệt và theo dõi nhân sự tự động.
+    <motion.header
+      variants={headerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+    >
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
+            <CalendarDays size={16} className="text-purple-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-800 tracking-tight">
+            Quản lý lịch nghỉ giáo viên
+          </h1>
+        </div>
+        <p className="text-xs text-slate-400 pl-10">
+          Hệ thống phê duyệt và theo dõi nhân sự tự động
         </p>
       </div>
-      <button
-        onClick={onCreateRequest}
-        className="btn-gradient from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-full font-bold shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform flex items-center gap-2"
-      >
-        <Plus className="w-5 h-5" />
-        Tạo yêu cầu nghỉ
-      </button>
-    </header>
+    </motion.header>
   );
 };

@@ -111,7 +111,7 @@ const StudentToolbar: React.FC<StudentToolbarProps> = ({
   const activeFilterCount = [gradeFilter, statusFilter, genderFilter, schoolFilter].filter(Boolean).length;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm overflow-hidden">
       {/* Search Row */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center gap-3">

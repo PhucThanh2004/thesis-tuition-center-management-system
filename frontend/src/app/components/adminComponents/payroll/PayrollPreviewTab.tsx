@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  FileSpreadsheet, 
-  Search, 
-  Loader2, 
-  UserCheck, 
-  ChevronRight, 
-  Calendar, 
-  Clock, 
+import {
+  FileSpreadsheet,
+  Search,
+  Loader2,
+  UserCheck,
+  ChevronRight,
+  Calendar,
+  Clock,
   Users,
   Sparkles,
   AlertCircle,
@@ -16,10 +16,10 @@ import type { PayrollFilter, PayrollPreviewResponse } from '../../../utils/types
 import { payrollApi } from '../../../utils/api/payroll.api';
 import { teacherApi } from '../../../utils/api/teacher.api';
 import './payroll.css';
+import { useOutletContext } from 'react-router-dom';
 
 interface PayrollPreviewTabProps {
   filters: PayrollFilter;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onSuccess: () => void;
 }
 
@@ -45,30 +45,30 @@ const sessionVariants = {
 
 // Skeleton loader
 const PreviewSkeleton: React.FC = () => (
-  <div className="space-y-6">
-    <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 animate-pulse">
+  <div className="space-y-5">
+    <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-5 animate-pulse">
       <div className="flex justify-between">
         <div className="space-y-2">
-          <div className="h-7 w-48 bg-slate-200 rounded" />
-          <div className="h-4 w-32 bg-slate-200 rounded" />
+          <div className="h-6 w-40 bg-slate-200 rounded" />
+          <div className="h-3 w-28 bg-slate-200 rounded" />
         </div>
         <div className="text-right space-y-1">
-          <div className="h-3 w-20 bg-slate-200 rounded" />
-          <div className="h-8 w-16 bg-slate-200 rounded" />
+          <div className="h-2.5 w-16 bg-slate-200 rounded" />
+          <div className="h-7 w-14 bg-slate-200 rounded" />
         </div>
       </div>
-      <div className="mt-4 pt-4 border-t border-slate-100">
+      <div className="mt-3 pt-3 border-t border-slate-100">
         <div className="flex justify-between">
-          <div className="h-4 w-24 bg-slate-200 rounded" />
-          <div className="h-8 w-32 bg-slate-200 rounded" />
+          <div className="h-3 w-20 bg-slate-200 rounded" />
+          <div className="h-7 w-28 bg-slate-200 rounded" />
         </div>
       </div>
     </div>
-    <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-      <div className="h-6 w-32 bg-slate-200 rounded mb-4 animate-pulse" />
-      <div className="space-y-3">
+    <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-5">
+      <div className="h-5 w-28 bg-slate-200 rounded mb-3 animate-pulse" />
+      <div className="space-y-2">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-16 bg-slate-100 rounded-lg animate-pulse" />
         ))}
       </div>
     </div>
@@ -77,31 +77,31 @@ const PreviewSkeleton: React.FC = () => (
 
 // Empty state component
 const EmptyPreviewState: React.FC = () => (
-  <motion.div 
+  <motion.div
     initial={{ opacity: 0, scale: 0.95 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="rounded-2xl bg-gradient-to-br from-slate-50 to-white border border-slate-200 shadow-sm p-12 text-center"
+    className="rounded-xl bg-white border border-slate-200 shadow-sm p-10 text-center"
   >
-    <div className="flex justify-center mb-4">
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center">
-        <FileSpreadsheet className="w-10 h-10 text-purple-400" />
+    <div className="flex justify-center mb-3">
+      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center">
+        <FileSpreadsheet className="w-8 h-8 text-purple-400" />
       </div>
     </div>
-    <h3 className="text-lg font-semibold text-slate-700 mb-2">Chưa có dữ liệu xem trước</h3>
-    <p className="text-sm text-slate-400 max-w-sm mx-auto">
-      Tìm và chọn giáo viên từ danh sách bên trái, sau đó nhấn "Xem trước lương" để hiển thị thông tin chi tiết
+    <h3 className="text-sm font-medium text-slate-700 mb-1">Chưa có dữ liệu xem trước</h3>
+    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+      Tìm và chọn giáo viên từ danh sách bên trái, sau đó nhấn "Xem trước lương"
     </p>
-    <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
-      <span className="flex items-center gap-1"><Search className="w-3 h-3" /> Tìm kiếm</span>
+    <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-slate-400">
+      <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" /> Tìm kiếm</span>
       <span>→</span>
-      <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" /> Chọn giáo viên</span>
+      <span className="flex items-center gap-1"><UserCheck className="w-2.5 h-2.5" /> Chọn</span>
       <span>→</span>
-      <span className="flex items-center gap-1"><FileSpreadsheet className="w-3 h-3" /> Xem trước</span>
+      <span className="flex items-center gap-1"><FileSpreadsheet className="w-2.5 h-2.5" /> Xem</span>
     </div>
   </motion.div>
 );
 
-const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToast, onSuccess }) => {
+const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, onSuccess }) => {
   const [previewData, setPreviewData] = useState<PayrollPreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -110,8 +110,9 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
   const [searching, setSearching] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<{ teacherId: number; name: string } | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-
-  // ========== 1. TÌM KIẾM GIÁO VIÊN THEO TÊN (GIỮ NGUYÊN) ==========
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { setAlert } = useOutletContext<any>();
+  // ========== 1. TÌM KIẾM GIÁO VIÊN ==========
   const handleSearch = useCallback(async () => {
     if (!searchTerm.trim() || searchTerm.length < 2) {
       setSearchResults([]);
@@ -119,36 +120,31 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
     }
 
     setSearching(true);
-    console.log('🔍 Searching for teacher:', searchTerm);
-    
+
     try {
       const response = await teacherApi.getAll(1, 50, { name: searchTerm });
-      console.log('📥 Search response:', response);
-      
+
       if (response.success && response.data && response.data.length > 0) {
         const results = response.data.map((teacher: any) => ({
           userId: teacher.id,
           name: teacher.fullName,
           email: teacher.email
         }));
-        console.log('✅ Found users:', results);
         setSearchResults(results);
         setShowDropdown(true);
       } else {
-        console.log('❌ No teachers found');
         setSearchResults([]);
         setShowDropdown(false);
       }
     } catch (error) {
       console.error('Search error:', error);
-      showToast('Không thể tìm kiếm giáo viên', 'error');
+      setAlert({ message: 'Không thể tìm kiếm giáo viên', type: 'error' });
       setSearchResults([]);
     } finally {
       setSearching(false);
     }
-  }, [searchTerm, showToast]);
+  }, [searchTerm, setAlert]);
 
-  // Debounce tìm kiếm (GIỮ NGUYÊN)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm && searchTerm.length >= 2) {
@@ -161,43 +157,49 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
     return () => clearTimeout(timer);
   }, [searchTerm, handleSearch]);
 
-  // ========== 2. CHỌN GIÁO VIÊN (GIỮ NGUYÊN) ==========
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ========== 2. CHỌN GIÁO VIÊN ==========
   const handleSelectTeacher = async (user: { userId: number; name: string; email?: string }) => {
-    console.log('👤 Selected user ID:', user.userId);
     setSearching(true);
-    
+
     try {
       const response = await teacherApi.getTeacherIdByUserId(user.userId);
-      console.log('📥 Teacher ID response:', response);
-      
       const teacherId = response.teacherId;
-      
+
       if (!teacherId) {
-        showToast('Không tìm thấy mã giáo viên cho người dùng này', 'error');
+        setAlert({ message: 'Không tìm thấy mã giáo viên cho người dùng này', type: 'error' });
         return;
       }
-      
+
       setSelectedTeacher({ teacherId: teacherId, name: user.name });
       setSearchTerm(user.name);
       setShowDropdown(false);
       setPreviewData(null);
-      showToast(`Đã chọn giáo viên: ${user.name}`, 'success');
+      setAlert({ message: `Đã chọn giáo viên: ${user.name}`, type: 'success' });
     } catch (error) {
       console.error('Failed to get teacher ID:', error);
-      showToast('Không thể lấy thông tin giáo viên', 'error');
+      setAlert({ message: 'Không thể lấy thông tin giáo viên', type: 'error' });
     } finally {
       setSearching(false);
     }
   };
 
-  // ========== 3. XEM TRƯỚC LƯƠNG (GIỮ NGUYÊN) ==========
+  // ========== 3. XEM TRƯỚC LƯƠNG ==========
   const handlePreview = async () => {
     if (!selectedTeacher) {
-      showToast('Vui lòng chọn giáo viên từ danh sách tìm kiếm', 'info');
+      setAlert({ message: 'Vui lòng chọn giáo viên', type: 'info' });
       return;
     }
-
-    console.log('📊 Previewing payroll for Teacher ID:', selectedTeacher.teacherId);
 
     setLoading(true);
     try {
@@ -206,19 +208,18 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
         month: filters.month || new Date().getMonth() + 1,
         year: filters.year || new Date().getFullYear()
       });
-      console.log('📊 Preview data:', data);
       setPreviewData(data);
-      showToast(`Đã tìm thấy ${data.totalSessions} buổi dạy`, 'success');
+      setAlert({ message: `Đã tìm thấy ${data.totalSessions} buổi dạy`, type: 'success' });
     } catch (error: any) {
       console.error('Preview error:', error);
       const errorMsg = error?.response?.data?.message || error?.message || 'Không thể xem trước bảng lương';
-      
+
       if (errorMsg.includes('Teacher not found')) {
-        showToast(`Không tìm thấy giáo viên với ID ${selectedTeacher.teacherId} trong hệ thống`, 'error');
+        setAlert({ message: `Không tìm thấy giáo viên với ID ${selectedTeacher.teacherId}`, type: 'error' });
       } else if (errorMsg.includes('not found') || error?.response?.status === 500) {
-        showToast('Giáo viên không có buổi dạy trong tháng này', 'error');
+        setAlert({ message: 'Giáo viên không có buổi dạy trong tháng này', type: 'error' });
       } else {
-        showToast(errorMsg, 'error');
+        setAlert({ message: errorMsg, type: 'error' });
       }
       setPreviewData(null);
     } finally {
@@ -226,7 +227,7 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
     }
   };
 
-  // ========== 4. TẠO BẢNG LƯƠNG (GIỮ NGUYÊN) ==========
+  // ========== 4. TẠO BẢNG LƯƠNG ==========
   const handleGeneratePayroll = async () => {
     if (!selectedTeacher) return;
 
@@ -238,81 +239,74 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
         year: filters.year || new Date().getFullYear(),
         overwriteExisting: false
       });
-      showToast(`Tạo bảng lương cho ${selectedTeacher.name} thành công!`, 'success');
+      setAlert({ message: `Tạo bảng lương cho ${selectedTeacher.name} thành công!`, type: 'success' });
       onSuccess();
     } catch (error: any) {
       console.error('Generate error:', error);
       const errorMsg = error?.response?.data?.message || error?.message || '';
       if (errorMsg.includes('already generated')) {
-        showToast('Bảng lương cho giáo viên này trong tháng đã được tạo trước đó', 'error');
-      } else if (errorMsg.includes('Teacher not found')) {
-        showToast('Giáo viên không tồn tại trong hệ thống', 'error');
+        setAlert({ message: 'Bảng lương đã được tạo trước đó', type: 'error' });
       } else {
-        showToast(errorMsg || 'Không thể tạo bảng lương', 'error');
+        setAlert({ message: errorMsg || 'Không thể tạo bảng lương', type: 'error' });
       }
     } finally {
       setGenerating(false);
     }
   };
 
-  // Format currency
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString('vi-VN') + 'đ';
   };
 
-  // ========== 5. GIAO DIỆN CẢI TIẾN ==========
   return (
-    <motion.div 
+    <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+      className="grid grid-cols-1 lg:grid-cols-3 gap-5"
     >
-      {/* Left: Teacher Search Panel */}
       <motion.div variants={itemVariants} className="lg:col-span-1">
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+        <div className="rounded-xl bg-white border border-slate-200 shadow-sm">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-100">
-                <Users className="h-4 w-4 text-purple-600" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100">
+                <Users className="h-3.5 w-3.5 text-purple-600" />
               </div>
+
               <div>
-                <h4 className="text-sm font-semibold text-slate-700">Chọn giáo viên</h4>
-                <p className="text-xs text-slate-400">Tìm kiếm theo tên để xem trước lương</p>
+                <h4 className="text-xs font-medium text-slate-700">Chọn giáo viên</h4>
+                <p className="text-[10px] text-slate-400">Tìm kiếm theo tên để xem trước lương</p>
               </div>
             </div>
           </div>
-          
-          <div className="p-6">
-            {/* Search Input */}
-            <div className="relative mb-4">
+
+          <div className="p-4">
+            <div className="relative mb-3" ref={dropdownRef}>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="    Nhập tên giáo viên (tối thiểu 2 ký tự)..."
+                  placeholder="Nhập tên giáo viên..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setSelectedTeacher(null);
                   }}
                   onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-                  className="w-full px-4 py-3 pl-11 pr-10 rounded-xl border border-slate-200 focus:border-purple-300 focus:ring-2 focus:ring-purple-100 focus:outline-none bg-white text-slate-700 text-sm transition-all placeholder:text-slate-400"
+                  className="w-full h-11 pl-11 pr-10 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 transition-all"
                 />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 {searching && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-500 animate-spin" />
                 )}
               </div>
-              
-              {/* Dropdown kết quả tìm kiếm */}
+
               <AnimatePresence>
                 {showDropdown && searchResults.length > 0 && (
                   <motion.div
-                    initial={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute z-20 mt-2 w-full bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden"
-                  >
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 right-0 top-full mt-2 z-50 bg-white rounded-xl border border-slate-200 shadow-xl max-h-72 overflow-y-auto custom-scrollbar"                  >
                     {searchResults.map((teacher, idx) => (
                       <motion.div
                         key={teacher.userId}
@@ -320,53 +314,72 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
                         animate={{ opacity: 1 }}
                         transition={{ delay: idx * 0.03 }}
                         onClick={() => handleSelectTeacher(teacher)}
-                        className="p-3 hover:bg-purple-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0 group"
+                        className="px-3 py-3 cursor-pointer hover:bg-purple-50 transition-colors border-b border-slate-100 last:border-b-0 group"
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-slate-700 group-hover:text-purple-700 transition-colors">{teacher.name}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-700 group-hover:text-purple-700 truncate">
+                              {teacher.name}
+                            </p>
+
                             {teacher.email && (
-                              <p className="text-xs text-slate-400 mt-0.5">{teacher.email}</p>
+                              <p className="text-xs text-slate-400 truncate mt-0.5">
+                                {teacher.email}
+                              </p>
                             )}
                           </div>
-                          <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-purple-400 transition-colors" />
+
+                          <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-purple-500 shrink-0" />
                         </div>
                       </motion.div>
                     ))}
+
+                    {searchResults.length > 6 && (
+                      <div className="px-3 py-2 text-center text-[11px] text-slate-400 bg-slate-50">
+                        Hiển thị 6 / {searchResults.length} kết quả
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
-              
-              {/* Thông báo khi không tìm thấy */}
+
               {searchTerm.length >= 2 && !searching && searchResults.length === 0 && (
-                <motion.p 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-xs text-amber-600 mt-1 flex items-center gap-1"
+                  className="mt-2 flex items-center gap-1 text-xs text-amber-600"
                 >
                   <AlertCircle className="h-3 w-3" />
-                  Không tìm thấy giáo viên nào với tên "{searchTerm}"
-                </motion.p>
+                  Không tìm thấy giáo viên
+                </motion.div>
               )}
             </div>
 
-            {/* Selected Teacher Info */}
             <AnimatePresence>
               {selectedTeacher && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="mb-4 p-4 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/30 border border-purple-200"
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  className="mb-3 p-3 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100/30 border border-purple-200"
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-200">
-                      <UserCheck className="h-3.5 w-3.5 text-purple-700" />
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-200">
+                      <UserCheck className="h-3 w-3 text-purple-700" />
                     </div>
-                    <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Đã chọn</span>
+
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-purple-600">
+                      Đã chọn
+                    </span>
                   </div>
-                  <p className="font-semibold text-slate-800">{selectedTeacher.name}</p>
-                  <p className="text-xs text-purple-500 mt-0.5">Teacher ID: {selectedTeacher.teacherId}</p>
+
+                  <p className="text-sm font-medium text-slate-800">
+                    {selectedTeacher.name}
+                  </p>
+
+                  <p className="text-[10px] text-purple-500 mt-0.5">
+                    ID: {selectedTeacher.teacherId}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -376,16 +389,16 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
               whileTap={{ scale: 0.98 }}
               onClick={handlePreview}
               disabled={!selectedTeacher || loading}
-              className="w-full py-3 rounded-xl font-semibold text-sm transition-all btn-gradient from-purple-600 to-purple-700 text-white shadow-sm shadow-purple-200 hover:shadow-md hover:shadow-purple-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full py-2 rounded-lg text-sm font-medium text-white transition-all gradient-btn disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Đang xem trước...
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-3.5 w-3.5" />
                   Xem trước lương
                 </span>
               )}
@@ -393,47 +406,46 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
           </div>
         </div>
       </motion.div>
-
       {/* Right: Preview Details */}
       <div className="lg:col-span-2">
         {loading ? (
           <PreviewSkeleton />
         ) : previewData ? (
-          <motion.div 
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="space-y-5"
+            className="space-y-4"
           >
-            {/* Teacher Info Card - Premium */}
-            <motion.div variants={itemVariants} className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-              <div className="relative h-24 bg-gradient-to-r from-purple-600 via-purple-500 to-purple-600">
-                <div className="absolute -bottom-8 left-6">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg border border-slate-100">
-                    <Users className="h-8 w-8 text-purple-600" />
+            {/* Teacher Info Card */}
+            <motion.div variants={itemVariants} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+              <div className="relative h-20 bg-gradient-to-r from-purple-500 to-purple-600">
+                <div className="absolute -bottom-6 left-5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-md border border-slate-100">
+                    <Users className="h-6 w-6 text-purple-600" />
                   </div>
                 </div>
               </div>
-              <div className="pt-10 px-6 pb-6">
-                <div className="flex flex-wrap justify-between items-start gap-4">
+              <div className="pt-8 px-5 pb-4">
+                <div className="flex flex-wrap justify-between items-start gap-3">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-800">{previewData.teacherName}</h3>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-slate-400">ID: {previewData.teacherId}</span>
-                      <span className="text-xs text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full">
+                    <h3 className="text-base font-semibold text-slate-800">{previewData.teacherName}</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-slate-400">ID: {previewData.teacherId}</span>
+                      <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">
                         Tháng {previewData.month}/{previewData.year}
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Tổng số buổi</p>
-                    <p className="text-3xl font-bold text-purple-600">{previewData.totalSessions}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Tổng số buổi</p>
+                    <p className="text-2xl font-semibold text-purple-600">{previewData.totalSessions}</p>
                   </div>
                 </div>
-                <div className="mt-5 pt-4 border-t border-slate-100">
+                <div className="mt-3 pt-3 border-t border-slate-100">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500">Tổng lương dự kiến</span>
-                    <span className="text-2xl font-bold text-emerald-600">
+                    <span className="text-xs text-slate-500">Tổng lương dự kiến</span>
+                    <span className="text-xl font-semibold text-emerald-600">
                       {formatCurrency(previewData.totalAmount)}
                     </span>
                   </div>
@@ -441,16 +453,16 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
               </div>
             </motion.div>
 
-            {/* Sessions List - Premium */}
-            <motion.div variants={itemVariants} className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+            {/* Sessions List */}
+            <motion.div variants={itemVariants} className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-purple-500" />
-                  <h4 className="text-sm font-semibold text-slate-700">Chi tiết các buổi dạy</h4>
-                  <span className="ml-auto text-xs text-slate-400">{previewData.sessions.length} buổi</span>
+                  <Calendar className="h-3.5 w-3.5 text-purple-500" />
+                  <h4 className="text-xs font-medium text-slate-700">Chi tiết các buổi dạy</h4>
+                  <span className="ml-auto text-[10px] text-slate-400">{previewData.sessions.length} buổi</span>
                 </div>
               </div>
-              <div className="p-4 max-h-96 overflow-y-auto custom-scrollbar">
+              <div className="p-3 max-h-80 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                   <AnimatePresence>
                     {previewData.sessions.map((session, idx) => (
@@ -461,40 +473,38 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
                         initial="hidden"
                         animate="visible"
                         whileHover={{ scale: 1.01 }}
-                        className="group p-4 rounded-xl bg-slate-50/50 hover:bg-purple-50/30 transition-all duration-200 border border-transparent hover:border-purple-100"
+                        className="group p-3 rounded-lg bg-slate-50/50 hover:bg-purple-50/30 transition-all duration-200 border border-transparent hover:border-purple-100"
                       >
-                        <div className="flex flex-wrap justify-between items-start gap-3">
+                        <div className="flex flex-wrap justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-slate-700 group-hover:text-purple-700 transition-colors">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-medium text-slate-700 group-hover:text-purple-700 transition-colors">
                                 {session.subjectName}
                               </p>
                               {session.replacement && (
-                                <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                                  <Clock className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                                  <Clock className="h-2.5 w-2.5" />
                                   Dạy thay
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                              <span className="flex items-center gap-0.5">
+                                <Calendar className="h-2.5 w-2.5" />
                                 {session.sessionDate}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
                                 {session.startTime} - {session.endTime}
                               </span>
-                              <span className="flex items-center gap-1">
-                                ⏱️ {session.workedHours} giờ
-                              </span>
+                              <span>⏱️ {session.workedHours} giờ</span>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-purple-600">
+                            <p className="text-sm font-semibold text-purple-600">
                               {formatCurrency(session.amount)}
                             </p>
-                            <p className="text-xs text-slate-400 mt-0.5">
+                            <p className="text-[10px] text-slate-400 mt-0.5">
                               {session.salaryType === 'PER_HOUR' ? '💰 Theo giờ' : '📅 Theo buổi'}
                             </p>
                           </div>
@@ -513,16 +523,16 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
               whileTap={{ scale: 0.98 }}
               onClick={handleGeneratePayroll}
               disabled={generating}
-              className="w-full py-4 rounded-xl font-semibold text-white btn-gradient from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-200 hover:shadow-md hover:shadow-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg font-medium text-sm gradient-btn from-emerald-500 to-emerald-600 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {generating ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Đang tạo bảng lương...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Đang tạo...
                 </>
               ) : (
                 <>
-                  <FileSpreadsheet className="h-5 w-5" />
+                  <FileSpreadsheet className="h-4 w-4" />
                   Tạo bảng lương
                 </>
               )}
@@ -535,7 +545,7 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+          width: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: #f1f5f9;
@@ -544,9 +554,6 @@ const PayrollPreviewTab: React.FC<PayrollPreviewTabProps> = ({ filters, showToas
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #cbd5e1;
           border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
         }
       `}</style>
     </motion.div>

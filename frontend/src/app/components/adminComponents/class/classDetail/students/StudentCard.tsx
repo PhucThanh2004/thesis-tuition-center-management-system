@@ -16,6 +16,7 @@ type StudentCardProps = {
   onEdit: () => void;
   onRemove: () => void;
   isTeacher: boolean;
+  overallProgress?: number; // Thêm prop cho tiến độ tổng thể
 };
 
 export const StudentCard = ({
@@ -26,10 +27,14 @@ export const StudentCard = ({
   onView,
   onEdit,
   onRemove,
-  isTeacher
+  isTeacher,
+  overallProgress = 0 // Mặc định là 0 nếu chưa có dữ liệu
 }: StudentCardProps) => {
-  const progress = Math.floor(Math.random() * 40) + 60;
-  const status = getStatusLabel(progress);
+  // Sử dụng overallProgress từ prop thay vì random
+  const progress = overallProgress;
+  // Kiểm tra xem đã có đánh giá hay chưa (progress = 0 và chưa có curriculum nào được đánh giá)
+  const hasEvaluation = overallProgress > 0 || student.hasAnyEvaluation === true;
+  const status = getStatusLabel(progress, hasEvaluation);
 
   return (
     <motion.div
@@ -84,21 +89,37 @@ export const StudentCard = ({
         <div className="hidden md:block w-24">
           <div className="flex items-center justify-between text-[9px] text-slate-500 mb-0.5">
             <span>Tiến độ</span>
-            <span className="font-medium text-violet-600">{progress}%</span>
+            <span className="font-medium text-violet-600">
+              {hasEvaluation ? `${progress}%` : "0%"}
+            </span>
           </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          {hasEvaluation ? (
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${progress}%`,
+                  background: "linear-gradient(to right, #8b5cf6, #6366f1)"
+                }}
+              />
+            </div>
+          ) : (
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-slate-300"
+                style={{ width: "100%" }}
+              />
+            </div>
+          )}
         </div>
 
         <span className={cn(
           "hidden sm:inline-flex text-[10px] font-semibold px-2 py-1 rounded-full",
-          statusColors[status.color as keyof typeof statusColors]
+          hasEvaluation
+            ? statusColors[status.color as keyof typeof statusColors]
+            : "bg-slate-100 text-slate-500"
         )}>
-          {status.label}
+          {hasEvaluation ? status.label : "Chưa đánh giá"}
         </span>
 
         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>

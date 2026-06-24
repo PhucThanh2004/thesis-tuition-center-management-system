@@ -4,11 +4,13 @@ import { studentApi } from '../../utils/api';
 import { getImageSrc, getInitials } from '../../utils/helpers';
 import { formatPhoneNumber } from '../../utils/helpers/formatPhoneNumber';
 import { Users, Mail, Phone, School, Calendar, ChevronRight, GraduationCap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function StudentsTable() {
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchStatistics = async () => {
@@ -48,7 +50,10 @@ export function StudentsTable() {
             <p className="table-subtitle">Danh sách học viên vừa đăng ký gần đây</p>
           </div>
         </div>
-        <button className="view-all-link">
+        <button
+          className="view-all-link"
+          onClick={() => navigate("/admin/student")}
+        >
           Xem tất cả
           <ChevronRight className="link-icon" />
         </button>

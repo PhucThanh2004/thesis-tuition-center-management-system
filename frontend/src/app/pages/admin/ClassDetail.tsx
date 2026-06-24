@@ -46,13 +46,12 @@ export const ClassDetail = ({isTeacher}: Props) => {
   console.log("Class ID:", id);
 
   return (
-    <div className="flex flex-col w-full">
-      <main className="w-full px-10 py-10">
-        <div className="max-w-[1200px] w-full mx-auto flex flex-col gap-6">
+    <div className="flex flex-col w-full min-h-screen ">
+      <main className="w-full px-10 py-6">
 
-          <CourseOverviewSection subject={subject} isTeacher={isTeacher} />
+        <div className="max-w-[1200px] w-full mx-auto flex flex-col gap-6">
           <TabNavigationSection activeTab={activeTab} setActiveTab={setActiveTab} subject={subject} />
-          <MainContentSection activeTab={activeTab} subject={subject} onRefreshSubject={handleRefreshSubject} isTeacher={isTeacher} />
+          <MainContentSection activeTab={activeTab} subject={subject} onRefreshSubject={handleRefreshSubject} isTeacher={isTeacher} onTabChange={setActiveTab} />
         </div>
       </main>
     </div>

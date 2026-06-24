@@ -1,15 +1,15 @@
 // src/app/components/adminComponents/leaves/LeaveTableRow.tsx
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Check,
   X,
-  Mail,
-  Calendar,
-  Clock,
   User,
-  Eye
+  Eye,
+  ChevronRight
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import type { LeaveRequest } from '../../../utils/types/teacherLeave';
 
 interface LeaveTableRowProps {
@@ -21,6 +21,16 @@ interface LeaveTableRowProps {
   onViewDetail?: (id: string) => void;
 }
 
+// ✅ Copy hàm getFullImageUrl từ TeacherDetailPage
+const getFullImageUrl = (imagePath: string | null | undefined): string => {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http')) return imagePath;
+  const baseUrl = import.meta.env.VITE_BACKEND_URL_IMAGE || import.meta.env.VITE_BACKEND_URL || '';
+  const cleanBaseUrl = baseUrl.replace(/\/v1\/api$/, '');
+  const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  return `${cleanBaseUrl}${path}`;
+};
+
 export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
   leave,
   isSelected,
@@ -30,50 +40,62 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
   onViewDetail,
 }) => {
   const navigate = useNavigate();
+  const [imageError, setImageError] = useState(false);
 
-  const getStatusStyle = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'Chờ duyệt':
-        return 'bg-amber-50 text-amber-700';
+        return { 
+          bg: 'bg-amber-50', 
+          text: 'text-amber-600', 
+          border: 'border-amber-200',
+          dot: 'bg-amber-500',
+          pulse: 'animate-pulse'
+        };
       case 'Đã duyệt':
-        return 'bg-emerald-50 text-emerald-700';
+        return { 
+          bg: 'bg-emerald-50', 
+          text: 'text-emerald-600', 
+          border: 'border-emerald-200',
+          dot: 'bg-emerald-500',
+          pulse: ''
+        };
       case 'Từ chối':
-        return 'bg-red-50 text-red-700';
+        return { 
+          bg: 'bg-red-50', 
+          text: 'text-red-600', 
+          border: 'border-red-200',
+          dot: 'bg-red-500',
+          pulse: ''
+        };
       default:
-        return 'bg-gray-50 text-gray-600';
+        return { 
+          bg: 'bg-slate-50', 
+          text: 'text-slate-500', 
+          border: 'border-slate-200',
+          dot: 'bg-slate-400',
+          pulse: ''
+        };
     }
   };
 
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case 'Chờ duyệt':
-        return 'bg-amber-500';
-      case 'Đã duyệt':
-        return 'bg-emerald-500';
-      case 'Từ chối':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-400';
-    }
-  };
-
-  const getLeaveTypeStyle = (type: string) => {
+  const getLeaveTypeConfig = (type: string) => {
     switch (type) {
       case 'Nghỉ phép năm':
-        return 'bg-blue-50 text-blue-700';
+        return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
       case 'Nghỉ ốm':
-        return 'bg-purple-50 text-purple-700';
+        return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
       case 'Việc riêng':
-        return 'bg-orange-50 text-orange-600';
+        return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
       default:
-        return 'bg-gray-50 text-gray-600';
+        return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200' };
     }
   };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'N/A';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN');
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const calculateDays = () => {
@@ -89,11 +111,28 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
   };
 
   const handleRowClick = () => {
-    console.log('Row clicked, navigating to:', `/admin/teacher/leave/${leave.id}`);
     navigate(`/admin/teacher/leave/${leave.id}`);
   };
 
-  // Component này trả về các td, KHÔNG phải tr
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+  const statusConfig = getStatusConfig(leave.status);
+  const typeConfig = getLeaveTypeConfig(leave.leaveType);
+  const days = calculateDays();
+  const initials = getInitials(leave.teacherName);
+
+  // ✅ Sử dụng getFullImageUrl giống TeacherDetailPage
+  const avatarUrl = leave.avatar ? getFullImageUrl(leave.avatar) : null;
+  const hasAvatar = leave.avatar && !imageError && avatarUrl;
+
   return (
     <>
       {/* Checkbox */}
@@ -102,50 +141,78 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
           type="checkbox"
           checked={isSelected}
           onChange={(e) => onSelect(leave.id, e.target.checked)}
-          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+          className="rounded border-slate-300 text-purple-600 focus:ring-2 focus:ring-purple-200 focus:ring-offset-0 cursor-pointer transition-all"
         />
       </td>
 
       {/* Giáo viên */}
       <td className="px-4 py-3" onClick={handleRowClick}>
-        <div className="flex items-center gap-3 cursor-pointer">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-            <User className="w-4 h-4 text-purple-600" />
+        <div className="flex items-center gap-3 cursor-pointer group">
+          <div className="relative">
+            {hasAvatar ? (
+              <img
+                src={avatarUrl}
+                alt={leave.teacherName}
+                className="h-9 w-9 rounded-xl object-cover ring-2 ring-purple-100 group-hover:ring-purple-300 transition-all"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-all">
+                <span className="text-sm font-semibold text-purple-600">{initials}</span>
+              </div>
+            )}
+            {leave.status === 'Chờ duyệt' && (
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse ring-2 ring-white" />
+            )}
           </div>
           <div>
-            <p className="font-semibold text-gray-800 text-sm">{leave.teacherName}</p>
-            <p className="text-xs text-gray-400">{leave.department}</p>
+            <p className="text-sm font-medium text-slate-700 group-hover:text-purple-600 transition-colors">
+              {leave.teacherName}
+            </p>
+            <p className="text-[10px] text-slate-400">{leave.department}</p>
           </div>
         </div>
       </td>
 
       {/* Mã GV */}
-      <td className="px-4 py-3 text-gray-500 text-sm" onClick={handleRowClick}>
-        {leave.teacherCode}
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <span className="font-mono text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">
+          {leave.teacherCode}
+        </span>
       </td>
 
       {/* Loại nghỉ */}
       <td className="px-4 py-3" onClick={handleRowClick}>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeStyle(leave.leaveType)}`}>
+        <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-medium border ${typeConfig.bg} ${typeConfig.text} ${typeConfig.border}`}>
           {leave.leaveType}
         </span>
       </td>
 
       {/* Ngày nghỉ */}
-      <td className="px-4 py-3 text-gray-600 text-sm" onClick={handleRowClick}>
-        {formatDate(leave.startDate)}
-        {leave.endDate && leave.endDate !== leave.startDate && ` → ${formatDate(leave.endDate)}`}
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <span className="font-medium">{formatDate(leave.startDate)}</span>
+          {leave.endDate && leave.endDate !== leave.startDate && (
+            <>
+              <span className="text-slate-300">→</span>
+              <span className="font-medium">{formatDate(leave.endDate)}</span>
+            </>
+          )}
+        </div>
       </td>
 
       {/* Số ngày */}
-      <td className="px-4 py-3 text-gray-600 text-sm" onClick={handleRowClick}>
-        {calculateDays()} ngày
+      <td className="px-4 py-3" onClick={handleRowClick}>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-slate-700">{days}</span>
+          <span className="text-xs text-slate-400">ngày</span>
+        </div>
       </td>
 
       {/* Trạng thái */}
       <td className="px-4 py-3" onClick={handleRowClick}>
-        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(leave.status)}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(leave.status)}`} />
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} ${statusConfig.pulse}`} />
           {leave.status}
         </span>
       </td>
@@ -155,38 +222,45 @@ export const LeaveTableRow: React.FC<LeaveTableRowProps> = ({
         <div className="flex justify-end gap-1">
           {leave.status === 'Chờ duyệt' ? (
             <>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onApprove(leave.id);
                 }}
-                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200"
                 title="Duyệt"
               >
                 <Check className="w-4 h-4" />
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onReject(leave.id);
                 }}
-                className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
                 title="Từ chối"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </motion.button>
             </>
           ) : (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onViewDetail?.(leave.id);
               }}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200 flex items-center gap-1"
               title="Chi tiết"
             >
               <Eye className="w-4 h-4" />
-            </button>
+              <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </motion.button>
           )}
         </div>
       </td>

@@ -4,11 +4,13 @@ import { teacherApi } from '../../utils/api';
 import type { TeacherBasic } from '../../utils/types/teacher';
 import { formatPhoneNumber } from '../../utils/helpers/formatPhoneNumber';
 import { getImageSrc, getInitials } from '../../utils/helpers';
+import { useNavigate } from 'react-router-dom';
 
 export function TeachersList() {
   const [teachers, setTeachers] = useState<TeacherBasic[]>([]);
   const [loading, setLoading] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -44,10 +46,13 @@ export function TeachersList() {
               cùng thành tích nổi bật trong giảng dạy và nghiên cứu.
             </p>
           </div>
-          <button className="view-all-link">
-            Xem tất cả
-            <ChevronRight className="link-icon" />
-          </button>
+           <button
+          className="view-all-link"
+          onClick={() => navigate("/admin/teacher")}
+        >
+          Xem tất cả
+          <ChevronRight className="link-icon" />
+        </button>
         </div>
 
         {/* Loading State với Skeleton */}

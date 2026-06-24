@@ -403,7 +403,7 @@ export const CurriculumSection = ({ subject, isTeacher = false }: Props) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col gap-6 pb-10"
+      className="flex flex-col gap-6 pb-10 px-10"
     >
       {/* Header with Create Button */}
       <div className="flex justify-between items-center">

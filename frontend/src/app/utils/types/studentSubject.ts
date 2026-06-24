@@ -1,5 +1,6 @@
 export interface StudentSubject {
   id: number
+  userId: number
   fullName: string
   gender: boolean | null
   dateOfBirth: string

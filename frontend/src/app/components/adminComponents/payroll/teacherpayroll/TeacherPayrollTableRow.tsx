@@ -1,34 +1,90 @@
-// src/components/teacherComponents/payroll/TeacherPayrollTableRow.tsx
 import { motion } from 'framer-motion';
-import { Eye, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Eye, CheckCircle, Clock, AlertCircle, Calendar, BookOpen, DollarSign, XCircle } from 'lucide-react'; // ✅ THÊM XCircle
 import type { TeacherPayrollSummary } from '../../../../utils/types/payroll';
 
 interface TeacherPayrollTableRowProps {
   payroll: TeacherPayrollSummary;
   onViewDetail: (paymentId: number) => void;
   onConfirm: (paymentId: number) => void;
+  onReject: (paymentId: number) => void; // ✅ THÊM MỚI
 }
 
-export const TeacherPayrollTableRow = ({ payroll, onViewDetail, onConfirm }: TeacherPayrollTableRowProps) => {
+const rowVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+  hover: { y: -1, transition: { duration: 0.15 } },
+};
+
+export const TeacherPayrollTableRow = ({ 
+  payroll, 
+  onViewDetail, 
+  onConfirm, 
+  onReject // ✅ THÊM MỚI
+}: TeacherPayrollTableRowProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   const getStatusBadge = () => {
-    const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
-      'DRAFT': { color: 'bg-gray-100 text-gray-800', label: 'Nháp', icon: AlertCircle },
-      'WAITING_TEACHER_CONFIRMATION': { color: 'bg-yellow-100 text-yellow-800', label: 'Chờ xác nhận', icon: Clock },
-      'TEACHER_CONFIRMED': { color: 'bg-blue-100 text-blue-800', label: 'Đã xác nhận', icon: CheckCircle },
-      'FINALIZED': { color: 'bg-green-100 text-green-800', label: 'Đã chốt', icon: CheckCircle },
-      'PAID': { color: 'bg-purple-100 text-purple-800', label: 'Đã thanh toán', icon: CheckCircle },
+    const statusConfig: Record<string, { bgColor: string; textColor: string; label: string; icon: any; dotColor: string }> = {
+      'DRAFT': { 
+        bgColor: 'bg-slate-50', 
+        textColor: 'text-slate-600', 
+        label: 'Nháp', 
+        icon: AlertCircle,
+        dotColor: 'bg-slate-400'
+      },
+      'WAITING_TEACHER_CONFIRMATION': { 
+        bgColor: 'bg-amber-50', 
+        textColor: 'text-amber-600', 
+        label: 'Chờ xác nhận', 
+        icon: Clock,
+        dotColor: 'bg-amber-400'
+      },
+      'TEACHER_CONFIRMED': { 
+        bgColor: 'bg-blue-50', 
+        textColor: 'text-blue-600', 
+        label: 'Đã xác nhận', 
+        icon: CheckCircle,
+        dotColor: 'bg-blue-400'
+      },
+      'REJECTED': { // ✅ THÊM MỚI
+        bgColor: 'bg-red-50', 
+        textColor: 'text-red-600', 
+        label: 'Từ chối', 
+        icon: XCircle,
+        dotColor: 'bg-red-400'
+      },
+      'REQUEST_ADJUSTMENT': { // ✅ THÊM MỚI
+        bgColor: 'bg-amber-50', 
+        textColor: 'text-amber-700', 
+        label: 'Y/C điều chỉnh', 
+        icon: Clock,
+        dotColor: 'bg-amber-500'
+      },
+      'FINALIZED': { 
+        bgColor: 'bg-emerald-50', 
+        textColor: 'text-emerald-600', 
+        label: 'Đã chốt', 
+        icon: CheckCircle,
+        dotColor: 'bg-emerald-400'
+      },
+      'PAID': { 
+        bgColor: 'bg-purple-50', 
+        textColor: 'text-purple-600', 
+        label: 'Đã thanh toán', 
+        icon: CheckCircle,
+        dotColor: 'bg-purple-400'
+      },
     };
     
     const config = statusConfig[payroll.status] || statusConfig['DRAFT'];
     const Icon = config.icon;
     
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${config.color}`}>
-        <Icon size={12} />
+      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${config.bgColor} ${config.textColor}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${config.dotColor}`} />
+        <Icon size={10} />
         {config.label}
       </span>
     );
@@ -38,53 +94,89 @@ export const TeacherPayrollTableRow = ({ payroll, onViewDetail, onConfirm }: Tea
 
   return (
     <motion.div
-      whileHover={{ scale: 1.01 }}
-      className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all"
+      variants={rowVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      className="group bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
     >
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3">
         {/* Period */}
-        <div className="min-w-[120px]">
-          <p className="text-sm text-gray-500">Kỳ lương</p>
-          <p className="font-semibold text-gray-800">
-            Tháng {payroll.month}/{payroll.year}
+        <div className="min-w-[100px]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Calendar size={11} className="text-slate-400" />
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Kỳ lương</p>
+          </div>
+          <p className="text-sm font-medium text-slate-700">
+            {payroll.month}/{payroll.year}
           </p>
         </div>
 
         {/* Sessions */}
-        <div className="min-w-[100px]">
-          <p className="text-sm text-gray-500">Số buổi</p>
-          <p className="font-semibold text-gray-800">{payroll.totalSessions} buổi</p>
+        <div className="min-w-[80px]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <BookOpen size={11} className="text-slate-400" />
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Số buổi</p>
+          </div>
+          <p className="text-sm font-medium text-slate-700">
+            {payroll.totalSessions} <span className="text-xs text-slate-400">buổi</span>
+          </p>
         </div>
 
         {/* Amount */}
-        <div className="min-w-[150px]">
-          <p className="text-sm text-gray-500">Tổng tiền</p>
-          <p className="font-bold text-green-600">{formatCurrency(payroll.amount)}</p>
+        <div className="min-w-[130px]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <DollarSign size={11} className="text-slate-400" />
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Tổng tiền</p>
+          </div>
+          <p className="text-sm font-semibold text-emerald-600">
+            {formatCurrency(payroll.amount)}
+          </p>
         </div>
 
         {/* Status */}
-        <div className="min-w-[120px]">
-          <p className="text-sm text-gray-500">Trạng thái</p>
+        <div className="min-w-[110px]">
+          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1">Trạng thái</p>
           {getStatusBadge()}
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <button
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => onViewDetail(payroll.paymentId)}
-            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200"
             title="Xem chi tiết"
           >
-            <Eye size={18} />
-          </button>
+            <Eye size={16} />
+          </motion.button>
           
           {canConfirm && (
-            <button
-              onClick={() => onConfirm(payroll.paymentId)}
-              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Xác nhận
-            </button>
+            <>
+              {/* ✅ Nút Xác nhận */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onConfirm(payroll.paymentId)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all duration-200 shadow-sm flex items-center gap-1"
+              >
+                <CheckCircle size={12} />
+                Xác nhận
+              </motion.button>
+              
+              {/* ✅ THÊM MỚI: Nút Từ chối */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onReject(payroll.paymentId)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all duration-200 shadow-sm flex items-center gap-1"
+                title="Từ chối bảng lương"
+              >
+                <XCircle size={12} />
+                Từ chối
+              </motion.button>
+            </>
           )}
         </div>
       </div>

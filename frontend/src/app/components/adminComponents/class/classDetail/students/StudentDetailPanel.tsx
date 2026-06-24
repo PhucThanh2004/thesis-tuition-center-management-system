@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "../../../../../utils/cn";
-import { X } from "lucide-react";
+import { X, Users } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { StudentDetailTabs } from "./StudentDetailTabs";
 import { StudentDetailContent } from "./StudentDetailContent";
@@ -13,9 +13,9 @@ type StudentDetailPanelProps = {
   student: StudentSubject | null;
   subject: Subject | null;
   onClose: () => void;
+  onProgressUpdate?: (studentId: number) => void;
 };
 
-// Mock data - có thể move ra file constants riêng
 const getStudentDetailData = (student: StudentSubject) => ({
   personalInfo: {
     fullName: student.fullName,
@@ -33,8 +33,6 @@ const getStudentDetailData = (student: StudentSubject) => ({
     overallProgress: 78,
     averageScore: 8.2,
     attendanceRate: 94,
-    completedAssignments: 18,
-    totalAssignments: 22,
     rank: "Khá",
     rankColor: "text-blue-600 bg-blue-50",
     scoreBreakdown: {
@@ -72,8 +70,14 @@ const getStudentDetailData = (student: StudentSubject) => ({
   trendData: [7.5, 7.8, 8.0, 7.9, 8.2, 8.5],
 });
 
-export const StudentDetailPanel = ({ student, subject, onClose }: StudentDetailPanelProps) => {
+export const StudentDetailPanel = ({ student, subject, onClose, onProgressUpdate }: StudentDetailPanelProps) => {
   const [activeTab, setActiveTab] = useState<"overview" | "academic" | "attendance" | "scores" | "feedback">("overview");
+
+  const handleProgressUpdate = () => {
+    if (onProgressUpdate && student) {
+      onProgressUpdate(student.id);
+    }
+  };
 
   if (!student) {
     return (
@@ -112,7 +116,7 @@ export const StudentDetailPanel = ({ student, subject, onClose }: StudentDetailP
                   {student.gender === true ? "Nam" : "Nữ"}
                 </span>
                 <span className="text-[10px] text-slate-400">•</span>
-                <span className="text-[10px] text-slate-500">Mã HS: {studentData.personalInfo.studentCode}</span>
+                <span className="text-[10px] text-slate-500">Mã HS: HS{studentData.personalInfo.studentCode}</span>
               </div>
             </div>
           </div>
@@ -132,13 +136,12 @@ export const StudentDetailPanel = ({ student, subject, onClose }: StudentDetailP
           activeTab={activeTab}
           studentData={studentData}
           student={student}
-          studentId={student.id}        
-          subjectId={subject?.id}       
+          studentId={student.id}    
+          userId={student.userId}        
+          subjectId={subject?.id}
+          onProgressUpdate={handleProgressUpdate}
         />
       </div>
     </motion.div>
   );
 };
-
-// Import Users if needed
-import { Users } from "lucide-react";

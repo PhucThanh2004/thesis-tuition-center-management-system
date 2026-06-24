@@ -8,7 +8,12 @@ export const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-export const getStatusLabel = (progressValue: number) => {
+export const getStatusLabel = (progressValue: number, hasEvaluation: boolean = true) => {
+  // Nếu chưa có đánh giá, trả về "Chưa đánh giá"
+  if (!hasEvaluation || progressValue === 0) {
+    return { label: "Chưa đánh giá", color: "slate" };
+  }
+  
   if (progressValue >= 80) return { label: "Xuất sắc", color: "emerald" };
   if (progressValue >= 65) return { label: "Ổn định", color: "blue" };
   if (progressValue >= 50) return { label: "Trung bình", color: "amber" };
@@ -47,4 +52,5 @@ export const statusColors = {
   blue: "bg-blue-100 text-blue-700",
   amber: "bg-amber-100 text-amber-700",
   red: "bg-red-100 text-red-700",
+  slate: "bg-slate-100 text-slate-500", // Thêm màu cho "Chưa đánh giá"
 };

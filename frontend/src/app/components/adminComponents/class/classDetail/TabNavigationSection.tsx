@@ -1,3 +1,4 @@
+// TabNavigationSection.tsx (Căn giữa cả thanh tab)
 import { motion } from "framer-motion";
 import {
   Info,
@@ -9,13 +10,13 @@ import {
   BookOpen,
 } from "lucide-react";
 import type { Subject } from "../../../../utils/types/subject";
+import { cn } from "../../../ui/utils";
 
 type Tab = {
   id: number;
   label: string;
   icon: React.ReactNode;
   count?: number;
-
 };
 
 type TabNavigationSectionProps = {
@@ -30,26 +31,23 @@ export const TabNavigationSection = ({
   subject,
 }: TabNavigationSectionProps) => {
   const tabs: Tab[] = [
-    { id: 0, label: "Thông tin chi tiết", icon: <Info size={16} /> },
+    { id: 0, label: "Tổng quan", icon: <Info size={18} /> },
     {
       id: 1,
       label: "Học sinh",
-      icon: <Users size={16} />,
+      icon: <Users size={18} />,
       count: subject?.currentStudents ?? 0,
     },
-    { id: 2, label: "Lộ trình học", icon: <BookOpen size={16} /> },
-    { id: 3, label: "Lịch học", icon: <Calendar size={16} /> },
-    { id: 4, label: "Tài liệu", icon: <FileText size={16} /> },
-    { id: 5, label: "Điểm danh", icon: <CheckSquare size={16} /> },
-    { id: 6, label: "Báo cáo", icon: <BarChart3 size={16} /> },
+    { id: 2, label: "Lộ trình", icon: <BookOpen size={18} /> },
+    { id: 3, label: "Lịch học", icon: <Calendar size={18} /> },
+    { id: 4, label: "Tài liệu", icon: <FileText size={18} /> },
+    { id: 5, label: "Điểm danh", icon: <CheckSquare size={18} /> },
+    { id: 6, label: "Báo cáo", icon: <BarChart3 size={18} /> },
   ];
 
   return (
-    <div className="border-b border-slate-200/60">
-      <nav
-        className="flex items-center gap-1 overflow-x-auto scrollbar-hide"
-        role="tablist"
-      >
+    <div className="w-full border-b border-slate-200">
+      <div className="flex items-center justify-center gap-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
 
@@ -57,34 +55,34 @@ export const TabNavigationSection = ({
             <motion.button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={isActive}
               className={cn(
-                "relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all duration-200",
+                "relative flex items-center gap-2 px-6 py-2.5 transition-all duration-200",
+                "text-sm font-medium whitespace-nowrap",
                 isActive
-                  ? "text-violet-600"
-                  : "text-slate-400 hover:text-slate-600"
+                  ? "text-indigo-600"
+                  : "text-slate-500 hover:text-slate-700"
               )}
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
             >
               {/* Icon */}
-              <motion.span
-                animate={isActive ? { scale: 1.05 } : { scale: 1 }}
-              >
+              <span className={cn(
+                "transition-all duration-200",
+                isActive && "text-indigo-600"
+              )}>
                 {tab.icon}
-              </motion.span>
+              </span>
 
               {/* Label */}
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
 
-              {/* Count */}
+              {/* Count badge */}
               {tab.count !== undefined && tab.count > 0 && (
                 <span
                   className={cn(
-                    "px-1.5 py-0.5 text-[10px] font-semibold rounded-full",
+                    "px-1.5 py-0.5 text-xs font-semibold rounded-md transition-all",
                     isActive
-                      ? "bg-violet-100 text-violet-600"
+                      ? "bg-indigo-50 text-indigo-600"
                       : "bg-slate-100 text-slate-500"
                   )}
                 >
@@ -92,27 +90,18 @@ export const TabNavigationSection = ({
                 </span>
               )}
 
-              {/* Underline chỉ khi active */}
+              {/* Active indicator */}
               {isActive && (
                 <motion.div
-                  layoutId="tab-underline"
-                  className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-violet-500 rounded-full"
-                  transition={{
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 30,
-                  }}
+                  layoutId="active-tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               )}
             </motion.button>
           );
         })}
-      </nav>
+      </div>
     </div>
   );
-};
-
-// Helper
-const cn = (...classes: (string | false | undefined)[]) => {
-  return classes.filter(Boolean).join(" ");
 };

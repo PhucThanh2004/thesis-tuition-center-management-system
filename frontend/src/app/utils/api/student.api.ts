@@ -74,25 +74,33 @@ export const studentApi = {
   },
 
   // Lấy danh sách học sinh (có phân trang và lọc)
-  async getAll(
+    async getAll(
     page = 1,
     limit = 10,
     filters?: StudentFilterParams
   ): Promise<StudentResponse> {
     try {
-      // Gọi API đúng với cấu trúc BE
+      // ⚠️ QUAN TRỌNG: Xử lý status filter
+      let statusParam: string | undefined = undefined;
+      
+      // Nếu có filter status và không phải undefined
+      if (filters?.status !== undefined && filters?.status !== null) {
+        statusParam = filters.status ? 'true' : 'false';
+      }
+      // Nếu không truyền status, BE sẽ tự động lấy status = true (chỉ active)
+
       const response = await axios.get('/students', {
         params: {
-          page, limit,
+          page, 
+          limit,
           name: filters?.search,
           grade: filters?.grade,
           schoolName: filters?.schoolName,
           gender: filters?.gender !== undefined ? (filters.gender ? 'true' : 'false') : undefined,
-          status: filters?.status !== undefined ? (filters.status ? 'true' : 'false') : undefined
+          status: statusParam // 👈 Thêm status vào params
         }
       }) as BEStudentResponse
 
-      // Chuyển đổi response từ BE sang format FE
       return {
         total: response.pagination?.total || 0,
         data: response.data || [],
@@ -202,14 +210,19 @@ export const studentApi = {
     return axios.delete(`/students/${studentId}/parents/${parentId}`)
   },
 
-  // Xuất danh sách học sinh ra file Excel
   exportExcel(filters?: StudentFilterParams): Promise<Blob> {
+    let statusParam: string | undefined = undefined;
+    if (filters?.status !== undefined && filters?.status !== null) {
+      statusParam = filters.status ? 'true' : 'false';
+    }
+
     return axios.get('/students/export', {
       params: {
         name: filters?.search,
         grade: filters?.grade,
         schoolName: filters?.schoolName,
-        gender: filters?.gender !== undefined ? (filters.gender ? 'true' : 'false') : undefined
+        gender: filters?.gender !== undefined ? (filters.gender ? 'true' : 'false') : undefined,
+        status: statusParam // 👈 Thêm status
       },
       responseType: 'blob'
     })
@@ -238,6 +251,38 @@ export const studentApi = {
     } catch (error: any) {
       console.error('getLatestStudents error:', error);
       return [];
+    }
+  },
+  restore(id: number): Promise<{ errCode: number; message: string }> {
+    return axios.patch(`/students/${id}/restore`)
+  },
+
+  async getGroupBySchool(filters?: {
+    name?: string;
+    grade?: string;
+    schoolName?: string;
+    gender?: boolean;
+    status?: boolean;
+  }): Promise<any> {
+    try {
+      let statusParam: string | undefined = undefined;
+      if (filters?.status !== undefined && filters?.status !== null) {
+        statusParam = filters.status ? 'true' : 'false';
+      }
+
+      const response = await axios.get('/students/group-by-school', {
+        params: {
+          name: filters?.name,
+          grade: filters?.grade,
+          schoolName: filters?.schoolName,
+          gender: filters?.gender !== undefined ? (filters.gender ? 'true' : 'false') : undefined,
+          status: statusParam // 👈 Thêm status
+        }
+      })
+      return response
+    } catch (error: any) {
+      console.error('getGroupBySchool error:', error)
+      throw error
     }
   }
 }

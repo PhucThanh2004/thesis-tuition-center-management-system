@@ -6,8 +6,6 @@ import {
     Video,
     MoreVertical,
     CloudDownload,
-    Eye,
-    Download,
     Cloud,
     Sparkles,
     HelpCircle,
@@ -40,7 +38,6 @@ interface MaterialCardProps {
 
 export const MaterialCard = memo(({ 
     material, 
-    onStar, 
     onDownload, 
     onDelete, 
     onPreview, 
@@ -207,17 +204,6 @@ export const MaterialCard = memo(({
                         </motion.button>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-3 mt-3 pt-2 text-[10px] text-slate-400 dark:text-slate-500">
-                    <div className="flex items-center gap-1">
-                        <Eye size={12} />
-                        <span>{material.views || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <Download size={12} />
-                        <span>{material.downloads || 0}</span>
-                    </div>
-                </div>
             </div>
         </motion.div>
     );
@@ -326,52 +312,6 @@ export const StorageCard = memo(({ materials }: StorageCardProps) => {
                         <span className="text-slate-600 dark:text-slate-400">{segment.label}</span>
                         <span className="text-slate-400 ml-auto">{segment.percentage.toFixed(1)}%</span>
                     </div>
-                ))}
-            </div>
-        </motion.div>
-    );
-});
-
-export const ActivityCard = memo(() => {
-    const activities = [
-        { id: 1, user: "Bạn", action: "đã tải lên", target: "Ma trận.pdf", time: "2 giờ trước", isHighlight: true },
-        { id: 2, user: "Lê Minh", action: "đã xem", target: "Bài tập Không gian Vectơ", time: "5 giờ trước", isHighlight: false },
-        { id: 3, user: "Trần Thị B", action: "đã tải về", target: "Đề thi giữa kỳ.pdf", time: "1 ngày trước", isHighlight: false },
-    ];
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 dark:border-slate-800/60 p-5 shadow-sm hover:shadow-md transition-all duration-300"
-        >
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm">Hoạt động gần đây</h3>
-                <button className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
-                    Xem tất cả
-                </button>
-            </div>
-
-            <div className="space-y-4">
-                {activities.map((activity, idx) => (
-                    <motion.div
-                        key={activity.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 + idx * 0.1 }}
-                        className="flex gap-3 group cursor-pointer"
-                    >
-                        <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${activity.isHighlight ? "bg-indigo-500" : "bg-slate-400"}`} />
-                        <div className="flex-1">
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                <span className="font-semibold text-slate-800 dark:text-slate-200">{activity.user}</span>
-                                {" "}{activity.action}{" "}
-                                <span className="font-medium text-indigo-600 dark:text-indigo-400">{activity.target}</span>
-                            </p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{activity.time}</p>
-                        </div>
-                    </motion.div>
                 ))}
             </div>
         </motion.div>

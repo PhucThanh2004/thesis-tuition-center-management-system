@@ -186,10 +186,6 @@ export function RecentActivities() {
                 {!loadingClasses && `${classes.length} lớp học trong tuần`}
               </p>
             </div>
-           <button className="view-all-link">
-              Xem tất cả
-              <ChevronRight className="link-icon" />
-            </button>
           </div>
 
           <div className="classes-list">

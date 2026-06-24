@@ -19,6 +19,8 @@ import {
   X,
   CalendarPlus,
   ClockPlus,
+  AlertCircle,
+  BookOpen,
 } from "lucide-react";
 import { sessionApi } from "../../../../utils/api";
 import type { SessionDetail, SessionOfSubject } from "../../../../utils/types/session";
@@ -486,7 +488,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
   const SUBJECT_ID = subject.id;
 
   // Fetch sessions
-   useEffect(() => {
+  useEffect(() => {
     const fetchSchedule = async () => {
       try {
         setLoading(true);
@@ -505,7 +507,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
     fetchSchedule();
   }, [SUBJECT_ID, setAlert]);
 
- // Fetch session detail với error handling
+  // Fetch session detail với error handling
   useEffect(() => {
     if (!selectedSession?.id) {
       setSessionDetail(null);
@@ -673,32 +675,32 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
         type: "success",
         message: "Tạo lịch học thành công!",
       });
-    } catch (err) { 
-      console.error(err); 
+    } catch (err) {
+      console.error(err);
       setAlert?.({
         type: "error",
         message: "Có lỗi xảy ra khi tải lại danh sách buổi học!",
       });
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   }, [SUBJECT_ID, setAlert]);
 
   const handleOpenSessionModal = () => { setEditingSession(null); setShowSessionModal(true); };
   const handleCloseSessionModal = () => { setShowSessionModal(false); setEditingSession(null); };
-   const handleSessionSuccess = useCallback(async () => {
+  const handleSessionSuccess = useCallback(async () => {
     try {
       setLoading(true);
       const res = await sessionApi.getScheduleBySubject(SUBJECT_ID);
       setSessions(res.sessions);
-    } catch (err) { 
-      console.error(err); 
+    } catch (err) {
+      console.error(err);
       setAlert?.({
         type: "error",
         message: "Có lỗi xảy ra khi tải lại danh sách buổi học!",
       });
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   }, [SUBJECT_ID, setAlert]);
 
@@ -855,74 +857,72 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
             </div>
           </motion.div>
 
-          {/* Right Panel - Session Detail */}
+          {/* Right Panel - Session Detail - COMPACT VERSION */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="lg:col-span-4 xl:col-span-3">
-            <div className="sticky top-8 space-y-6">
+            <div className="sticky top-8">
               {selectedSession && sessionDetail ? (
                 <div className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 dark:border-slate-800/60 shadow-xl overflow-hidden">
-                  <div className="relative p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-50/50 to-transparent dark:from-indigo-950/20">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
-                        <Calendar size={20} />
+                  {/* Header - Compact */}
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-50/50 to-transparent dark:from-indigo-950/20">
+                    <div className="flex items-start gap-2">
+                      <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                        <Calendar size={16} />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chi tiết buổi học</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {new Date(sessionDetail.sessionDate).toLocaleDateString("vi-VN", { weekday: 'long', month: 'long', day: 'numeric' })}
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">Chi tiết buổi học</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {new Date(sessionDetail.sessionDate).toLocaleDateString("vi-VN", { weekday: 'short', month: 'short', day: 'numeric' })}
                         </p>
                       </div>
-                      <button className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                        <MoreHorizontal size={18} />
-                      </button>
                     </div>
-                    <div className="mt-4 flex items-center justify-between">
+                    
+                    <div className="mt-3 flex items-center justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
                           {formatTime(sessionDetail.startTime)} - {formatTime(sessionDetail.endTime)}
                         </p>
                         {sessionDetail.room && (
-                          <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
-                            <MapPin size={14} /> {sessionDetail.room.name}
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                            <MapPin size={12} /> {sessionDetail.room.name}
                           </p>
                         )}
                       </div>
-                      <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusConfig(sessionDetail.status).bgClass} ${getStatusConfig(sessionDetail.status).textClass}`}>
+                      <div className={`px-2 py-1 rounded-full text-[10px] font-semibold ${getStatusConfig(sessionDetail.status).bgClass} ${getStatusConfig(sessionDetail.status).textClass}`}>
                         {getStatusConfig(sessionDetail.status).label}
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-5 space-y-6">
-
-                    {/* Attendance Section with Progress */}
+                  <div className="p-4 space-y-4">
+                    {/* Attendance Stats - Compact */}
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
-                        <Users size={16} /> Tổng quan điểm danh
+                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 mb-3">
+                        <Users size={14} /> Điểm danh
                       </h4>
                       {loadingDetail ? (
-                        <div className="flex justify-center py-8">
-                          <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full" />
+                        <div className="flex justify-center py-4">
+                          <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full" />
                         </div>
                       ) : sessionDetail ? (
-                        <div className="space-y-4">
-                          <div className="flex justify-between text-sm">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
                             <span className="text-slate-600 dark:text-slate-400">Có mặt</span>
                             <span className="font-semibold text-emerald-600">{attendanceStats.present}</span>
                           </div>
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between text-xs">
                             <span className="text-slate-600 dark:text-slate-400">Đi trễ</span>
                             <span className="font-semibold text-amber-600">{attendanceStats.late}</span>
                           </div>
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between text-xs">
                             <span className="text-slate-600 dark:text-slate-400">Vắng mặt</span>
                             <span className="font-semibold text-rose-600">{attendanceStats.absent}</span>
                           </div>
-                          <div className="pt-2">
-                            <div className="flex justify-between text-xs mb-1">
-                              <span>Tỷ lệ chuyên cần</span>
+                          <div className="pt-1">
+                            <div className="flex justify-between text-[10px] mb-1">
+                              <span>Chuyên cần</span>
                               <span>{attendanceStats.attendanceRate}%</span>
                             </div>
-                            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <motion.div
                                 key={attendanceStats.attendanceRate}
                                 initial={{ width: 0 }}
@@ -934,29 +934,147 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500 text-center py-6">Chưa có dữ liệu điểm danh cho ngày này</p>
+                        <p className="text-xs text-slate-500 text-center py-3">Chưa có dữ liệu điểm danh</p>
                       )}
                     </div>
 
-                    {/* Action Buttons */}
-                    {/* Action Buttons */}
-                    <div className="space-y-3 pt-2">
+                    {/* Session Content - Compact */}
+                    {sessionDetail && (
+                      <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 mb-3">
+                          <BookOpen size={14} /> Nội dung
+                        </h4>
+
+                        {loadingDetail ? (
+                          <div className="flex justify-center py-3">
+                            <div className="animate-spin w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+                          </div>
+                        ) : sessionDetail ? (
+                          <div className="space-y-3">
+                            {/* Following Plan Badge - Compact */}
+                            <div className={`flex items-center gap-1.5 p-2 rounded-lg text-xs ${sessionDetail.isFollowingPlan
+                                ? 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800'
+                                : 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
+                              }`}>
+                              {sessionDetail.isFollowingPlan ? (
+                                <CheckCircle size={12} className="text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <AlertCircle size={12} className="text-amber-600 dark:text-amber-400" />
+                              )}
+                              <span className={`text-xs font-medium ${sessionDetail.isFollowingPlan
+                                  ? 'text-emerald-700 dark:text-emerald-400'
+                                  : 'text-amber-700 dark:text-amber-400'
+                                }`}>
+                                {sessionDetail.isFollowingPlan ? 'Dạy đúng kế hoạch' : 'Dạy lệch kế hoạch'}
+                              </span>
+                            </div>
+
+                            {/* Display Topic - Compact */}
+                            {sessionDetail.displayTopic && (
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  CHỦ ĐỀ
+                                </label>
+                                <p className="text-xs text-slate-800 dark:text-slate-200 mt-0.5">
+                                  {sessionDetail.displayTopic}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Display Content - Compact */}
+                            {sessionDetail.displayContent && (
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  NỘI DUNG
+                                </label>
+                                <div className="text-xs text-slate-700 dark:text-slate-300 mt-0.5 whitespace-pre-wrap line-clamp-3">
+                                  {sessionDetail.displayContent}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Display Homework - Compact */}
+                            {sessionDetail.displayHomework && (
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  BÀI TẬP
+                                </label>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5 line-clamp-2">
+                                  {sessionDetail.displayHomework}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Planned Topic - Compact */}
+                            {!sessionDetail.isFollowingPlan && sessionDetail.plannedTopic && (
+                              <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-l-2 border-slate-300 dark:border-slate-600">
+                                <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  KẾ HOẠCH
+                                </label>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 line-through mt-0.5">
+                                  {sessionDetail.plannedTopic}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Deviation Reason - Compact */}
+                            {sessionDetail.deviationReason && (
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  LÝ DO
+                                </label>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 italic mt-0.5">
+                                  {sessionDetail.deviationReason}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Note for Next Session - Compact */}
+                            {sessionDetail.noteForNextSession && (
+                              <div className="mt-2 p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                                <label className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                                  <Clock size={10} /> GHI CHÚ SAU
+                                </label>
+                                <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-0.5 line-clamp-2">
+                                  {sessionDetail.noteForNextSession}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-3">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Chưa cập nhật nội dung
+                            </p>
+                            <button
+                              onClick={onEditAttendance}
+                              className="mt-1 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              Cập nhật
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Buttons - Compact */}
+                    <div className="space-y-2 pt-2">
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={onEditAttendance}
-                        className="w-full py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                        className="w-full py-2 text-xs border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
                       >
-                        <Edit3 size={16} /> Chỉnh sửa điểm danh
+                        <Edit3 size={12} /> Điểm danh
                       </motion.button>
 
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={onUploadMaterial}
-                        className="w-full py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                        className="w-full py-2 text-xs border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
                       >
-                        <Upload size={16} /> Tải lên tài liệu
+                        <Upload size={12} /> Tài liệu
                       </motion.button>
 
                       {/* Chỉ hiển thị nút chỉnh sửa buổi học và hủy buổi học khi không phải teacher */}
@@ -966,9 +1084,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={handleEditSession}
-                            className="w-full py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                            className="w-full py-2 text-xs border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
                           >
-                            <Edit size={16} /> Chỉnh sửa buổi học
+                            <Edit size={12} /> Sửa buổi học
                           </motion.button>
 
                           <motion.button
@@ -976,12 +1094,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                             whileTap={{ scale: 0.98 }}
                             onClick={handleDeleteSession}
                             disabled={deletingSession}
-                            className="w-full py-2 text-rose-500 text-sm font-medium hover:text-rose-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-1.5 text-rose-500 text-xs font-medium hover:text-rose-600 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {deletingSession ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-rose-500 border-t-transparent" />
+                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-rose-500 border-t-transparent" />
                             ) : (
-                              <Trash2 size={16} />
+                              <Trash2 size={12} />
                             )}
                             {deletingSession ? "Đang xóa..." : "Xóa buổi học"}
                           </motion.button>
@@ -992,18 +1110,18 @@ export const CalendarSection: React.FC<CalendarSectionProps> = memo(({
                 </div>
               ) : loadingDetail ? (
                 <div className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 dark:border-slate-800/60 shadow-xl overflow-hidden">
-                  <div className="p-8 text-center">
-                    <div className="animate-spin w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4" />
-                    <p className="text-sm text-slate-500">Đang tải chi tiết buổi học...</p>
+                  <div className="p-6 text-center">
+                    <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-3" />
+                    <p className="text-xs text-slate-500">Đang tải...</p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 p-8 text-center">
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Calendar size={28} className="text-slate-400" />
+                <div className="bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 p-6 text-center">
+                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Calendar size={20} className="text-slate-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Chưa chọn buổi học</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Nhấp vào một buổi học để xem chi tiết</p>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Chưa chọn buổi học</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Nhấp vào buổi học để xem chi tiết</p>
                 </div>
               )}
             </div>

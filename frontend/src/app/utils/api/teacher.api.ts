@@ -47,10 +47,15 @@ export const teacherApi = {
   },
 
   async getBasicList(): Promise<TeacherBasic[]> {
-    const response = await axios.get('/teachers/basic') as TeacherBasicResponse;
-    return response.errCode === 0 ? response.data : [];
+    try {
+      const response = await axios.get('/teachers/basic') as TeacherBasicResponse;
+      // BE đã filter status = true trong service
+      return response.errCode === 0 ? response.data : [];
+    } catch (error) {
+      console.error('getBasicList error:', error);
+      return [];
+    }
   },
-
   async getAll(
     page = 1,
     limit = 10,
@@ -61,8 +66,13 @@ export const teacherApi = {
       if (filters?.name) params.name = filters.name;
       if (filters?.specialty) params.specialty = filters.specialty;
       if (filters?.gender !== undefined) params.gender = filters.gender ? 'true' : 'false';
-      if (filters?.status !== undefined) params.status = filters.status ? 'true' : 'false';
-      // alias search -> name
+      
+      // ⚠️ QUAN TRỌNG: Xử lý status filter
+      if (filters?.status !== undefined && filters?.status !== null) {
+        params.status = filters.status ? 'true' : 'false';
+      }
+      // Nếu không truyền status, BE sẽ tự động lấy status = true (chỉ active)
+      
       if (filters?.search) params.name = filters.search;
 
       const response = await axios.get('/teachers', { params }) as TeacherListResponse;
@@ -95,7 +105,7 @@ export const teacherApi = {
 
   async getById(id: number): Promise<Teacher | null> {
     try {
-      const response = await this.getAll(1, 1, { name: '' }); 
+      const response = await this.getAll(1, 1, { name: '' });
       const teacher = response.data.find(t => t.id === id);
       return teacher || null;
     } catch (error) {
@@ -147,7 +157,12 @@ export const teacherApi = {
     if (filters?.name) params.name = filters.name;
     if (filters?.specialty) params.specialty = filters.specialty;
     if (filters?.gender !== undefined) params.gender = filters.gender ? 'true' : 'false';
-    if (filters?.status !== undefined) params.status = filters.status ? 'true' : 'false';
+    
+    // ⚠️ Thêm status vào export
+    if (filters?.status !== undefined && filters?.status !== null) {
+      params.status = filters.status ? 'true' : 'false';
+    }
+    
     if (filters?.search) params.name = filters.search;
 
     return axios.get('/teachers/export', {
@@ -174,6 +189,9 @@ export const teacherApi = {
       };
     }
   },
+  restore(id: number): Promise<{ errCode: number; message: string }> {
+    return axios.patch(`/teachers/${id}/restore`).then(res => (res as any).data ?? res);
+  },
 };
 
 export const buildTeacherFormData = (data: any, file?: File): FormData => {
@@ -185,12 +203,10 @@ export const buildTeacherFormData = (data: any, file?: File): FormData => {
   formData.append('gender', data.gender ? 'true' : 'false');
   formData.append('roleId', 'R1');
   formData.append('dateOfBirth', data.dateOfBirth);
-
   formData.append('specialty', data.specialty);
 
-  if (data.status !== undefined) {
-    formData.append('status', data.status ? 'true' : 'false');
-  }
+  // ✅ Đảm bảo status luôn được gửi
+  formData.append('status', data.status !== undefined ? (data.status ? 'true' : 'false') : 'true');
 
   if (data.address) {
     formData.append('address.details', data.address.details);
@@ -204,4 +220,10 @@ export const buildTeacherFormData = (data: any, file?: File): FormData => {
 
   return formData;
 };
+export const getStatusLabel = (status: boolean): string => {
+  return status ? 'Hoạt động' : 'Đã ngưng';
+};
 
+export const getStatusBadgeClass = (status: boolean): string => {
+  return status ? 'badge-success' : 'badge-danger';
+};

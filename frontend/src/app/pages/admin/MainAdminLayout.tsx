@@ -1,3 +1,4 @@
+// MainLayout.tsx
 import { EduHeader } from '../../components/adminComponents/EduHeader'
 import { Outlet } from 'react-router-dom'
 import { useEffect, useState } from "react"
@@ -39,7 +40,7 @@ export function MainLayout() {
         </Alert>
       )}
 
-      <div className="pt-20">
+      <div>
         <Outlet context={{ setAlert }} />
       </div>
     </div>

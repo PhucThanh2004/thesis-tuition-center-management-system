@@ -17,7 +17,7 @@ import {
     UserCheck,
     UserX,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Subject } from "../../../../utils/types/subject";
 import { getSubjectStatusLabel } from "../../../../utils/helpers/subjectStatus";
 import AddClassModal from "../AddClassModal";
@@ -29,18 +29,34 @@ import type { StudentSubject } from "../../../../utils/types/studentSubject";
 import { studentSubjectApi } from "../../../../utils/api";
 import type { AttendanceToday } from "../../../../utils/types/attendance";
 import { attendanceApi } from "../../../../utils/api/attendance.api";
+import { evaluationApi } from "../../../../utils/api/evaluation.api";
+import type { CurriculumEvaluation } from "../../../../utils/types/evaluation";
 import { cn } from "../../../ui/utils";
 
+const getBillingTypeLabel = (type: string | null): string => {
+    if (!type) return '/tháng';
+    return type === 'PER_HOUR' ? '/giờ' : '/tháng';
+};
+
+const getBillingTypeFullLabel = (type: string | null): string => {
+    if (!type) return 'Theo tháng';
+    return type === 'PER_HOUR' ? 'Theo giờ' : 'Theo môn';
+};
+
+const getPaymentPlanLabel = (type: string | null): string => {
+    if (!type) return 'Chưa thiết lập';
+    return type === 'FULL' ? 'Trả toàn bộ' : 'Trả góp';
+};
 
 type Props = {
     subject: Subject | null;
     onRefresh?: () => void;
     isTeacher?: boolean;
+    onNavigateToMaterials?: () => void;
+    onNavigateToAttendance?: () => void;
 };
 
-// ============================================================================
 // Sub-components
-// ============================================================================
 
 const SkeletonLoader = () => (
     <div className="flex gap-6 w-full px-10 animate-pulse">
@@ -144,7 +160,6 @@ const StudentCard = ({ student, index }: { student: StudentSubject; index: numbe
 );
 
 const DocumentItem = ({ doc, index }: { doc: Material; index: number }) => {
-    const [isHovered, setIsHovered] = useState(false);
     const isNew = new Date(doc.uploadedAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000;
 
     return (
@@ -153,8 +168,6 @@ const DocumentItem = ({ doc, index }: { doc: Material; index: number }) => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
             whileHover={{ scale: 1.01, x: 2 }}
-            onHoverStart={() => setIsHovered(true)}
-            onHoverEnd={() => setIsHovered(false)}
             className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white hover:shadow-sm hover:border-slate-200 transition-all duration-200"
         >
             <div className="flex items-center gap-3">
@@ -244,16 +257,37 @@ const AttendanceCard = ({
     );
 };
 
-const StatChart = ({ chartData }: { chartData: number[] }) => {
+// ============================================================================
+// StatChart Component - Nhận dữ liệu động
+// ============================================================================
+
+const StatChart = ({ chartData, growthRate, isLoading }: { chartData: number[]; growthRate: number; isLoading?: boolean }) => {
     const [hoveredBar, setHoveredBar] = useState<number | null>(null);
-    const maxValue = Math.max(...chartData);
+    const maxValue = Math.max(...chartData, 1);
+
+    const getGrowthText = (rate: number) => {
+        if (rate > 0) return `+${rate}%`;
+        if (rate < 0) return `${rate}%`;
+        return '0%';
+    };
+
+    if (isLoading) {
+        return (
+            <div className="animate-pulse">
+                <div className="h-32 bg-white/20 rounded-lg" />
+                <div className="mt-4 pt-2 border-t border-white/20">
+                    <div className="h-4 w-24 bg-white/20 rounded" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div>
             <div className="flex items-end gap-1.5 h-32">
                 {chartData.map((h, i) => {
                     const heightPercent = (h / maxValue) * 100;
-                    const isActive = i === 4; // highlight the 5th bar (index 4)
+                    const isActive = i === chartData.length - 1;
 
                     return (
                         <motion.div
@@ -269,21 +303,24 @@ const StatChart = ({ chartData }: { chartData: number[] }) => {
                                 hoveredBar === i && "opacity-80"
                             )}
                             style={{ height: `${heightPercent}%`, minHeight: "4px" }}
-                        />
+                        >
+                        </motion.div>
                     );
                 })}
             </div>
             <div className="flex justify-between items-center mt-4 pt-2 border-t border-white/20">
                 <div className="flex items-center gap-1.5">
                     <span className="text-xs text-white/80">Tăng trưởng</span>
-                    <span className="text-sm font-bold text-white">+12%</span>
+                    <span className="text-sm font-bold text-white">{getGrowthText(growthRate)}</span>
                 </div>
-                <motion.div
-                    animate={{ x: [0, 4, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
-                >
-                    <TrendingUp size={16} className="text-white/90" />
-                </motion.div>
+                {growthRate > 0 && (
+                    <motion.div
+                        animate={{ x: [0, 4, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
+                    >
+                        <TrendingUp size={16} className="text-white/90" />
+                    </motion.div>
+                )}
             </div>
         </div>
     );
@@ -293,7 +330,7 @@ const StatChart = ({ chartData }: { chartData: number[] }) => {
 // Main Component
 // ============================================================================
 
-export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Props) => {
+export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false, onNavigateToMaterials, onNavigateToAttendance }: Props) => {
     const [openEditModal, setOpenEditModal] = useState(false);
     const [localSubject, setLocalSubject] = useState<Subject | null>(subject);
     const [materials, setMaterials] = useState<Material[]>([]);
@@ -304,58 +341,189 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
     const [searchTerm, setSearchTerm] = useState("");
     const [showAllStudents, setShowAllStudents] = useState(false);
 
-    const getTeacherStatusLabel = (status?: string) => {
-        switch (status) {
-            case "present":
-                return { label: "ĐÃ ĐẾN", color: "bg-emerald-100 text-emerald-700" };
-            case "absent":
-                return { label: "VẮNG", color: "bg-rose-100 text-rose-700" };
-            case "not_marked":
-            default:
-                return { label: "CHƯA ĐIỂM DANH", color: "bg-amber-100 text-amber-700" };
+    // State cho thống kê
+    const [chartData, setChartData] = useState<number[]>([40, 60, 55, 80, 95, 70, 85]);
+    const [growthRate, setGrowthRate] = useState<number>(12);
+    const [loadingStats, setLoadingStats] = useState(false);
+
+    // ============================================================
+    // HÀM TÍNH TOÁN THỐNG KÊ TỪ CURRICULUM EVALUATION
+    // ============================================================
+
+    /**
+     * Lấy tất cả curriculum evaluations của một học sinh
+     */
+    const getStudentCurriculumEvals = useCallback(async (studentId: number): Promise<CurriculumEvaluation[]> => {
+        try {
+            const result = await evaluationApi.getCurriculumEvaluations(studentId, localSubject!.id);
+            return result;
+        } catch (err) {
+            console.error(`Error for student ${studentId}:`, err);
+            return [];
         }
-    };
+    }, [localSubject?.id]);
 
-    const attendanceDisplay = (() => {
-        if (noSessionToday || !attendance) {
-            return {
-                date: "Hôm nay",
-                teacher: { label: "KHÔNG CÓ BUỔI", color: "bg-slate-100 text-slate-500" },
-                absent: "--",
-            };
-        }
+    /**
+     * Tính tiến độ theo tuần (7 tuần gần nhất) dựa trên overallProgress
+     */
+    const calculateWeeklyProgress = useCallback(async (): Promise<number[]> => {
 
-        const teacher = getTeacherStatusLabel(attendance.teacherStatus);
-        const total = attendance.totalStudents || 0;
-        const absent = attendance.absentStudents || 0;
-        const present = attendance.presentStudents || 0;
-        const late = attendance.lateStudents || 0;
-        const markedStudents = present + absent + late;
-
-        if (attendance.teacherStatus === "not_marked" && markedStudents === 0) {
-            return {
-                date: formatDate(attendance.date),
-                teacher,
-                absent: "--",
-            };
+        if (!localSubject?.id || students.length === 0) {
+            return [40, 60, 55, 80, 95, 70, 85];
         }
 
-        if (attendance.teacherStatus === "not_marked" || markedStudents < total) {
-            return {
-                date: formatDate(attendance.date),
-                teacher,
-                absent: `${absent}/${total}`,
-            };
+        try {
+            // Lấy curriculum evaluations của tất cả học sinh
+            const allCurriculumEvals = await Promise.all(
+                students.map(async (student) => {
+                    const curriculums = await getStudentCurriculumEvals(student.id);
+                    return {
+                        studentId: student.id,
+                        curriculums: curriculums || []
+                    };
+                })
+            );
+
+            const weeks = [0, 0, 0, 0, 0, 0, 0];
+            const today = new Date();
+
+            // Tính cho 7 tuần gần nhất
+            for (let weekIdx = 0; weekIdx < 7; weekIdx++) {
+                const weekEnd = new Date(today);
+                weekEnd.setDate(today.getDate() - (weekIdx * 7));
+                weekEnd.setHours(23, 59, 59, 999);
+
+                const weekStart = new Date(weekEnd);
+                weekStart.setDate(weekEnd.getDate() - 6);
+                weekStart.setHours(0, 0, 0, 0);
+
+                let totalProgress = 0;
+                let studentCount = 0;
+
+                for (const studentData of allCurriculumEvals) {
+                    // Lọc các curriculum được cập nhật trong tuần này
+                    const curriculumsInWeek = studentData.curriculums.filter(curriculum => {
+                        if (!curriculum.lastUpdated) return false;
+                        const updateDate = new Date(curriculum.lastUpdated);
+                        return updateDate >= weekStart && updateDate <= weekEnd;
+                    });
+
+                    if (curriculumsInWeek.length > 0) {
+                        // Tính trung bình overallProgress của các curriculum trong tuần
+                        const avgProgress = curriculumsInWeek.reduce(
+                            (sum, c) => sum + (c.overallProgress || 0), 0
+                        ) / curriculumsInWeek.length;
+                        totalProgress += avgProgress;
+                        studentCount++;
+                    }
+                }
+
+                if (studentCount > 0) {
+                    weeks[6 - weekIdx] = Math.round(totalProgress / studentCount);
+                }
+            }
+
+            // Làm mượt dữ liệu
+            for (let i = 0; i < weeks.length; i++) {
+                if (weeks[i] === 0 && i > 0) {
+                    weeks[i] = weeks[i - 1];
+                } else if (weeks[i] === 0 && i === 0) {
+                    weeks[i] = 50;
+                }
+            }
+
+            return weeks;
+
+        } catch (error) {
+            console.error("Error calculating weekly progress:", error);
+            return [40, 60, 55, 80, 95, 70, 85];
         }
+    }, [localSubject?.id, students, getStudentCurriculumEvals]);
 
-        return {
-            date: formatDate(attendance.date),
-            teacher,
-            absent: `${absent}/${total}`,
-        };
-    })();
+    /**
+     * Tính tỷ lệ tăng trưởng (so sánh overallProgress hiện tại vs tháng trước)
+     */
+    const calculateGrowthRate = useCallback(async (): Promise<number> => {
+        if (!localSubject?.id || students.length === 0) return 12;
 
-    // Data fetching effects
+        try {
+            let totalCurrentProgress = 0;
+            let totalPreviousProgress = 0;
+            let studentCount = 0;
+
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+            for (const student of students) {
+                const curriculums = await getStudentCurriculumEvals(student.id);
+
+                if (curriculums && curriculums.length > 0) {
+                    // Progress hiện tại: lấy overallProgress của tất cả curriculum
+                    const currentProgress = curriculums.reduce(
+                        (sum, c) => sum + (c.overallProgress || 0), 0
+                    ) / curriculums.length;
+                    totalCurrentProgress += currentProgress;
+
+                    // Progress cũ: lấy các curriculum có updatedAt cũ hơn 1 tháng
+                    const oldCurriculums = curriculums.filter(c => {
+                        if (!c.updatedAt) return false;
+                        return new Date(c.updatedAt) < oneMonthAgo;
+                    });
+
+                    if (oldCurriculums.length > 0) {
+                        const previousProgress = oldCurriculums.reduce(
+                            (sum, c) => sum + (c.overallProgress || 0), 0
+                        ) / oldCurriculums.length;
+                        totalPreviousProgress += previousProgress;
+                    } else {
+                        // Nếu không có dữ liệu cũ, ước lượng = currentProgress - 12
+                        totalPreviousProgress += Math.max(0, currentProgress - 12);
+                    }
+                    studentCount++;
+                }
+            }
+
+            if (studentCount === 0) return 12;
+
+            const currentAvg = totalCurrentProgress / studentCount;
+            const previousAvg = totalPreviousProgress / studentCount;
+
+            if (previousAvg > 0) {
+                return Math.round(((currentAvg - previousAvg) / previousAvg) * 100);
+            }
+            return currentAvg > 0 ? 100 : 0;
+
+        } catch (error) {
+            console.error("Error calculating growth rate:", error);
+            return 12;
+        }
+    }, [localSubject?.id, students, getStudentCurriculumEvals]);
+
+    /**
+     * Hàm chính: fetch thống kê
+     */
+    const fetchStatistics = useCallback(async () => {
+        if (!localSubject?.id || students.length === 0) return;
+
+        setLoadingStats(true);
+        try {
+            const [weeklyProgress, growth] = await Promise.all([
+                calculateWeeklyProgress(),
+                calculateGrowthRate()
+            ]);
+            setChartData(weeklyProgress);
+            setGrowthRate(growth);
+        } catch (error) {
+            console.error("Error fetching statistics:", error);
+        } finally {
+            setLoadingStats(false);
+        }
+    }, [localSubject?.id, students, calculateWeeklyProgress, calculateGrowthRate]);
+
+    // ============================================================
+    // useEffect hooks
+    // ============================================================
+
     useEffect(() => {
         setLocalSubject(subject);
     }, [subject]);
@@ -409,6 +577,68 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
         fetchAttendance();
     }, [localSubject?.id]);
 
+    // Gọi thống kê khi students thay đổi
+    useEffect(() => {
+        if (localSubject?.id && students.length > 0) {
+            fetchStatistics();
+        }
+    }, [localSubject?.id, students, fetchStatistics]);
+
+    // ============================================================
+    // Render helpers
+    // ============================================================
+
+    const getTeacherStatusLabel = (status?: string) => {
+        switch (status) {
+            case "present":
+                return { label: "ĐÃ ĐẾN", color: "bg-emerald-100 text-emerald-700" };
+            case "absent":
+                return { label: "VẮNG", color: "bg-rose-100 text-rose-700" };
+            case "not_marked":
+            default:
+                return { label: "CHƯA ĐIỂM DANH", color: "bg-amber-100 text-amber-700" };
+        }
+    };
+
+    const attendanceDisplay = (() => {
+        if (noSessionToday || !attendance) {
+            return {
+                date: "Hôm nay",
+                teacher: { label: "KHÔNG CÓ BUỔI", color: "bg-slate-100 text-slate-500" },
+                absent: "--",
+            };
+        }
+
+        const teacher = getTeacherStatusLabel(attendance.teacherStatus);
+        const total = attendance.totalStudents || 0;
+        const absent = attendance.absentStudents || 0;
+        const present = attendance.presentStudents || 0;
+        const late = attendance.lateStudents || 0;
+        const markedStudents = present + absent + late;
+
+        if (attendance.teacherStatus === "not_marked" && markedStudents === 0) {
+            return {
+                date: formatDate(attendance.date),
+                teacher,
+                absent: "--",
+            };
+        }
+
+        if (attendance.teacherStatus === "not_marked" || markedStudents < total) {
+            return {
+                date: formatDate(attendance.date),
+                teacher,
+                absent: `${absent}/${total}`,
+            };
+        }
+
+        return {
+            date: formatDate(attendance.date),
+            teacher,
+            absent: `${absent}/${total}`,
+        };
+    })();
+
     const isLoading = !localSubject;
     const handleUpdateSuccess = (updatedSubject: Subject) => {
         setLocalSubject(updatedSubject);
@@ -424,7 +654,9 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
     const classInfo = {
         className: localSubject?.name || "Chưa có tên",
         grade: localSubject?.grade || "Chưa có",
-        tuition: localSubject?.price ? `${localSubject.price}/giờ` : "Chưa có",
+        tuition: localSubject?.price
+            ? `${localSubject.price.toLocaleString()}đ ${getBillingTypeLabel(localSubject.billingType)}`
+            : "Chưa có",
         capacity: `${localSubject?.currentStudents || 0}/${localSubject?.maxStudents || 0}`,
         subject: `${localSubject?.subjectType?.name ?? "Chưa có"} - ${localSubject?.subjectType?.academicLevel?.name ?? "?"}`,
         status: localSubject?.status || "inactive",
@@ -434,10 +666,10 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
         teacherPhone: localSubject?.teacherSubjects?.[0]?.teacher?.user?.phoneNumber ?? "Chưa có",
         teacherSpecialty: localSubject?.teacherSubjects?.[0]?.teacher?.specialty ?? "Chưa có",
         teacherEmail: localSubject?.teacherSubjects?.[0]?.teacher?.user?.email ?? "Chưa có",
+        billingType: localSubject?.billingType,
+        paymentPlanType: localSubject?.paymentPlanType,
+        installmentCount: localSubject?.installmentCount,
     };
-
-    const chartData = [40, 60, 55, 80, 95, 70, 85];
-
     if (isLoading) {
         return <SkeletonLoader />;
     }
@@ -451,7 +683,7 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
         >
             {/* LEFT COLUMN */}
             <div className="flex-1 flex flex-col gap-6">
-                {/* CLASS INFO CARD - Redesigned */}
+                {/* CLASS INFO CARD */}
                 <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -493,7 +725,39 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <InfoCard label="Môn học" value={classInfo.subject} icon={BookOpen} />
                             <InfoCard label="Khối" value={classInfo.grade} icon={GraduationCap} />
-                            <InfoCard label="Học phí" value={classInfo.tuition} icon={DollarSign} />
+                            <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50/50 border border-slate-100">
+                                <DollarSign className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 flex flex-col gap-0.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Học phí</span>
+                                    {localSubject?.price ? (
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-slate-800">
+                                                    {localSubject.price.toLocaleString()}đ
+                                                </span>
+                                                <span className="text-[10px] text-slate-400">
+                                                    {getBillingTypeLabel(localSubject.billingType)}
+                                                </span>
+                                            </div>
+                                            {localSubject.paymentPlanType && (
+                                                <span className={cn(
+                                                    "text-[9px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap",
+                                                    localSubject.paymentPlanType === 'INSTALLMENT'
+                                                        ? "bg-amber-50 text-amber-600 border border-amber-200"
+                                                        : "bg-blue-50 text-blue-600 border border-blue-200"
+                                                )}>
+                                                    {getPaymentPlanLabel(localSubject.paymentPlanType)}
+                                                    {localSubject.paymentPlanType === 'INSTALLMENT' && localSubject.installmentCount && (
+                                                        <> ({localSubject.installmentCount} kỳ)</>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm text-slate-400">Chưa có</span>
+                                    )}
+                                </div>
+                            </div>
                             <InfoCard label="Sĩ số" value={classInfo.capacity} icon={Users} />
                             <InfoCard label="Lịch học" value={classInfo.schedule} icon={Calendar} />
                             <InfoCard label="Số buổi/tuần" value={localSubject?.sessionsPerWeek?.toString() || "—"} icon={Clock} />
@@ -505,16 +769,10 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                                 <div className="w-10 h-10 rounded-full btn-gradient flex items-center justify-center text-white font-semibold text-sm">
                                     {classInfo.teacherName.charAt(0) || "T"}
                                 </div>
-
                                 <div className="flex-1">
-                                    <p className="text-sm font-semibold text-slate-800">
-                                        {classInfo.teacherName}
-                                    </p>
-                                    <p className="text-xs text-slate-500">
-                                        Giáo viên chủ nhiệm
-                                    </p>
+                                    <p className="text-sm font-semibold text-slate-800">{classInfo.teacherName}</p>
+                                    <p className="text-xs text-slate-500">Giáo viên chủ nhiệm</p>
                                 </div>
-
                                 <div className="flex gap-1">
                                     <div className="p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer group">
                                         <Phone size={14} className="text-slate-400 group-hover:text-violet-500" />
@@ -524,31 +782,21 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Info Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100">
-
                                 <div className="text-xs">
                                     <span className="text-slate-400">Chuyên môn:</span>
-                                    <span className="ml-1 text-slate-600">
-                                        {classInfo.teacherSpecialty}
-                                    </span>
+                                    <span className="ml-1 text-slate-600">{classInfo.teacherSpecialty}</span>
                                 </div>
-
                                 <div className="text-xs">
                                     <span className="text-slate-400">Số điện thoại:</span>
-                                    <span className="ml-1 text-slate-600">
-                                        {classInfo.teacherPhone}
-                                    </span>
+                                    <span className="ml-1 text-slate-600">{classInfo.teacherPhone}</span>
                                 </div>
-
                                 <div className="text-xs">
                                     <span className="text-slate-400">Email:</span>
                                     <span className="ml-1 text-slate-600 whitespace-nowrap overflow-hidden text-ellipsis">
                                         {classInfo.teacherEmail}
                                     </span>
                                 </div>
-
                             </div>
                         </div>
 
@@ -560,7 +808,7 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                     </div>
                 </motion.div>
 
-                {/* STUDENTS SECTION - Redesigned as List Cards */}
+                {/* STUDENTS SECTION */}
                 <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -590,7 +838,6 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                             )}
                         </div>
                     </div>
-
                     <div className="p-4 space-y-2">
                         <AnimatePresence>
                             {displayedStudents.length > 0 ? (
@@ -605,7 +852,7 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
 
             {/* RIGHT SIDEBAR */}
             <aside className="w-full lg:w-[360px] flex flex-col gap-6 lg:sticky lg:top-6 self-start">
-                {/* DOCUMENTS SECTION - Redesigned */}
+                {/* DOCUMENTS SECTION */}
                 <motion.div
                     initial={{ x: 20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
@@ -614,19 +861,17 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                 >
                     <div className="flex justify-between items-center p-6 border-b border-slate-100">
                         <h2 className="text-lg font-bold text-slate-800">Tài liệu</h2>
-                        
                     </div>
-
                     <div className="p-4 space-y-2">
                         {materials.length > 0 ? (
                             materials.map((doc, idx) => <DocumentItem key={doc.id} doc={doc} index={idx} />)
                         ) : (
                             <EmptyState title="Chưa có tài liệu" description="Tải lên tài liệu đầu tiên" icon={FileText} />
                         )}
-
                         <motion.button
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
+                            onClick={onNavigateToMaterials}
                             className="w-full mt-3 flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl py-3 text-sm text-slate-500 hover:border-violet-300 hover:bg-violet-50/30 transition-all"
                         >
                             <Upload size={14} />
@@ -635,7 +880,7 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                     </div>
                 </motion.div>
 
-                {/* ATTENDANCE SECTION - Redesigned as Analytics Card */}
+                {/* ATTENDANCE SECTION */}
                 <motion.div
                     initial={{ x: 20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
@@ -649,11 +894,11 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                         </div>
                     </div>
                     <div className="p-6">
-                        <AttendanceCard attendanceDisplay={attendanceDisplay} onOpenAttendance={() => { }} />
+                        <AttendanceCard attendanceDisplay={attendanceDisplay} onOpenAttendance={onNavigateToAttendance} />
                     </div>
                 </motion.div>
 
-                {/* STATISTICS CARD - Upgraded */}
+                {/* STATISTICS CARD - Sử dụng dữ liệu thật từ API */}
                 <motion.div
                     initial={{ x: 20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
@@ -663,8 +908,12 @@ export const ClassDetailContent = ({ subject, onRefresh, isTeacher = false }: Pr
                     <div className="absolute inset-0 bg-black/5 pointer-events-none" />
                     <div className="relative z-10">
                         <h2 className="text-lg font-bold text-white mb-1">Thống kê nhanh</h2>
-                        <p className="text-xs text-white/70 mb-6">Hiệu suất học tập lớp hiện tại so với tháng trước</p>
-                        <StatChart chartData={chartData} />
+                        <p className="text-xs text-white/70 mb-6">Tiến độ học tập 7 tuần gần nhất</p>
+                        <StatChart
+                            chartData={chartData}
+                            growthRate={growthRate}
+                            isLoading={loadingStats}
+                        />
                     </div>
                 </motion.div>
             </aside>

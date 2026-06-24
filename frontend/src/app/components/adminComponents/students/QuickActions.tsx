@@ -1,6 +1,7 @@
 // src/app/components/students/QuickActions.tsx
 import React from 'react';
 import { Upload, PlusCircle, Download, ArrowRight, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Action {
   icon: React.ReactNode;
@@ -11,32 +12,42 @@ interface Action {
 
 interface QuickActionsProps {
   onAddStudent?: () => void;
+  onExport?: () => void;
+  onImport?: () => void;
+  onCreateClass?: () => void;
 }
 
-const QuickActions: React.FC<QuickActionsProps> = ({ onAddStudent }) => {
+const QuickActions: React.FC<QuickActionsProps> = ({ 
+  onAddStudent, 
+  onExport,
+  onImport,
+  onCreateClass 
+}) => {
+  const navigate = useNavigate();
+
   const actions: Action[] = [
     {
       icon: <Upload className="w-4 h-4" />,
       title: 'Nhập danh sách',
       subtitle: 'CSV/Excel',
-      onClick: () => console.log('Nhập danh sách')
+      onClick: onImport || (() => console.log('Nhập danh sách'))
     },
     {
       icon: <PlusCircle className="w-4 h-4" />,
       title: 'Tạo lớp học',
       subtitle: 'Thiết lập chương trình',
-      onClick: () => console.log('Tạo lớp học')
+      onClick: onCreateClass || (() => navigate('/admin/class'))
     },
     {
       icon: <Download className="w-4 h-4" />,
       title: 'Xuất dữ liệu',
-      subtitle: 'Tải bản sao dữ liệu',
-      onClick: () => console.log('Xuất dữ liệu')
+      subtitle: 'Excel',
+      onClick: onExport || (() => console.log('Xuất dữ liệu'))
     }
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm p-5">
       <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4">
         <div className="p-1.5 bg-purple-100 rounded-lg">
           <Zap className="w-4 h-4 text-purple-600" />

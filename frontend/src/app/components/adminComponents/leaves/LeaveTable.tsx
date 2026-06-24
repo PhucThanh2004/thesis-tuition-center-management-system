@@ -3,6 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LeaveTableRow } from './LeaveTableRow';
 import type { LeaveRequest } from '../../../utils/types/teacherLeave';
+import { FileText, Inbox } from 'lucide-react';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -15,9 +16,14 @@ interface LeaveTableProps {
 }
 
 const rowVariants = {
-  hidden: { opacity: 0, x: -20 },
+  hidden: { opacity: 0, x: -10 },
   visible: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: 20 }
+  exit: { opacity: 0, x: 10 }
+};
+
+const tableVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
 };
 
 export const LeaveTable: React.FC<LeaveTableProps> = ({
@@ -34,49 +40,53 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
   if (leaves.length === 0) {
     return (
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-12 text-center text-gray-500 border border-gray-100"
+        className="relative bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-dashed border-slate-300 shadow-sm"
       >
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 rounded-t-2xl" />
+        <div className="flex justify-center mb-4">
+          <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center shadow-inner">
+            <Inbox className="h-10 w-10 text-purple-300" />
+          </div>
         </div>
-        <p className="font-medium">Không có dữ liệu</p>
-        <p className="text-sm text-gray-400 mt-1">Chưa có đơn nghỉ nào được gửi</p>
+        <p className="text-base font-semibold text-slate-700">Không có dữ liệu</p>
+        <p className="text-sm text-slate-400 mt-1">Chưa có đơn nghỉ nào được gửi</p>
       </motion.div>
     );
   }
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100"
+      variants={tableVariants}
+      initial="hidden"
+      animate="visible"
+      className="relative bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-sm border border-slate-200/80"
     >
+      <div className="absolute top-0 left-0 right-0 h-0.5 btn-gradient from-purple-400 via-purple-500 to-purple-600" />
+      
       <div className="overflow-x-auto">
         <table className="min-w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-12 px-4 py-4 text-center">
+            <tr className="bg-slate-50/80 border-b border-slate-200/50">
+              <th className="w-10 px-4 py-3.5 text-center">
                 <input
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e) => onSelectAll(e.target.checked)}
-                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  className="rounded border-slate-300 text-purple-600 focus:ring-2 focus:ring-purple-200 focus:ring-offset-0 cursor-pointer transition-all"
                 />
               </th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Giáo viên</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Mã GV</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Loại nghỉ</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Ngày nghỉ</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Số ngày</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider">Trạng thái</th>
-              <th className="px-4 py-4 font-bold text-gray-500 text-xs uppercase tracking-wider text-right">Hành động</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Giáo viên</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Mã GV</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Loại nghỉ</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Ngày nghỉ</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Số ngày</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider">Trạng thái</th>
+              <th className="px-4 py-3.5 font-semibold text-[11px] text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100/80">
             <AnimatePresence mode="wait" initial={false}>
               {leaves.map((leave, index) => (
                 <motion.tr
@@ -85,8 +95,9 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                  whileHover={{ backgroundColor: '#fafafa' }}
+                  transition={{ duration: 0.25, delay: index * 0.03 }}
+                  whileHover={{ backgroundColor: 'rgba(124, 58, 237, 0.03)' }}
+                  className="group transition-all duration-200"
                 >
                   <LeaveTableRow
                     leave={leave}
@@ -101,6 +112,15 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
             </AnimatePresence>
           </tbody>
         </table>
+      </div>
+      
+      {/* Footer với số lượng */}
+      <div className="px-4 py-2.5 bg-slate-50/50 border-t border-slate-200/50 flex items-center justify-between text-xs text-slate-400">
+        <span>Hiển thị <span className="font-medium text-slate-600">{leaves.length}</span> đơn nghỉ</span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          {leaves.filter(l => l.status === 'Đã duyệt').length} đã duyệt
+        </span>
       </div>
     </motion.div>
   );

@@ -2639,3 +2639,28 @@ h1, h2, h3, h4, h5, h6, .heading-font {
   animation: fadeIn 0.3s ease;
 }
 
+/* Gradient colors for class progress bars */
+.gradient-secondary {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.gradient-primary {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.gradient-accent {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.gradient-danger {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+/* Hover effects for progress bars */
+.group:hover .gradient-secondary,
+.group:hover .gradient-primary,
+.group:hover .gradient-accent,
+.group:hover .gradient-danger {
+  filter: brightness(1.05);
+  transition: filter 0.3s ease;
+}

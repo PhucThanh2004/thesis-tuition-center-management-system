@@ -9,9 +9,10 @@ import {
   ChevronRight,
   XCircle,
   CheckCircle,
+  DollarSign,
 } from 'lucide-react';
 import { teacherLeaveApi } from '../../../utils/api/teacherLeave.api';
-import type { PreviewAffectedSessionResponse } from '../../../utils/types/teacherLeave'; 
+import type { PreviewAffectedSessionResponse, ReplacementWithSalary } from '../../../utils/types/teacherLeave';
 
 interface LeaveApprovalModalProps {
   isOpen: boolean;
@@ -24,12 +25,18 @@ interface LeaveApprovalModalProps {
   affectedSessions: PreviewAffectedSessionResponse[];
   onApprove: (options: {
     approvalType: 'full_leave' | 'flexible';
-    replacements: Record<string, string>;
+    replacements: ReplacementWithSalary[];  
     cancelledSessions: string[];
     comment: string;
   }) => void;
   onReject?: () => void;
   isSubmitting?: boolean;
+}
+
+// Interface cho dữ liệu replacement trong state
+interface ReplacementData {
+  teacherId: string;
+  salary: string;
 }
 
 export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
@@ -46,7 +53,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   isSubmitting = false,
 }) => {
   const [approvalType, setApprovalType] = useState<'full_leave' | 'flexible'>('full_leave');
-  const [replacements, setReplacements] = useState<Record<string, string>>({});
+  const [replacements, setReplacements] = useState<Record<string, ReplacementData>>({});
   const [cancelledSessions, setCancelledSessions] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [availableTeachersMap, setAvailableTeachersMap] = useState<Record<string, any[]>>({});
@@ -56,24 +63,39 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
 
   const totalSessions = affectedSessions.length;
   
-  // Đếm số buổi đã được xử lý (thay thế hoặc hủy) - chỉ áp dụng cho chế độ linh hoạt
-  const processedSessions = Object.keys(replacements).filter(id => replacements[id] && replacements[id] !== '').length + cancelledSessions.length;
+  // Đếm số buổi đã được xử lý (thay thế hoặc hủy)
+  const processedSessions = Object.keys(replacements).filter(
+    id => replacements[id]?.teacherId && replacements[id].teacherId !== ''
+  ).length + cancelledSessions.length;
   const isFlexibleIncomplete = approvalType === 'flexible' && totalSessions > 0 && processedSessions !== totalSessions;
 
-  const handleReplaceChange = (sessionId: string, teacherId: string) => {
-    setReplacements((prev) => ({ ...prev, [sessionId]: teacherId }));
+  // 👉 Cập nhật: lưu cả teacherId và salary
+  const handleReplaceChange = (sessionId: string, teacherId: string, salary?: string) => {
+    setReplacements((prev) => ({
+      ...prev,
+      [sessionId]: {
+        teacherId,
+        salary: salary || '',
+      },
+    }));
     // Nếu đã chọn giáo viên, loại khỏi danh sách hủy nếu có
     if (teacherId && teacherId !== '') {
       setCancelledSessions(prev => prev.filter(id => id !== sessionId));
     }
   };
 
+  // 👉 Cập nhật: khi chọn teacher, tự động set salary mặc định
+  const handleTeacherSelect = (sessionId: string, teacherId: string) => {
+    const teachers = availableTeachersMap[sessionId] || [];
+    const selectedTeacher = teachers.find(t => String(t.teacherId) === teacherId);
+    const defaultSalary = selectedTeacher?.defaultSalary?.toString() || '';
+    handleReplaceChange(sessionId, teacherId, defaultSalary);
+  };
+
   const handleCancelSession = (sessionId: string) => {
     if (cancelledSessions.includes(sessionId)) {
-      // Nếu đã hủy, bỏ hủy
       setCancelledSessions(prev => prev.filter(id => id !== sessionId));
     } else {
-      // Nếu chưa hủy, thêm vào danh sách hủy và xóa replacement nếu có
       setCancelledSessions(prev => [...prev, sessionId]);
       setReplacements(prev => {
         const newReplacements = { ...prev };
@@ -105,15 +127,36 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (approvalType === 'flexible' && isFlexibleIncomplete) return;
-    
-    onApprove({
-      approvalType,
-      replacements,
-      cancelledSessions,
-      comment,
+  if (approvalType === 'flexible' && isFlexibleIncomplete) return;
+  
+  // 👉 LOG: Kiểm tra dữ liệu replacements trước khi chuyển đổi
+  console.log('🔍 [LeaveApprovalModal] replacements state:', replacements);
+  console.log('🔍 [LeaveApprovalModal] approvalType:', approvalType);
+  
+  // 👉 Chuyển đổi dữ liệu thành ReplacementWithSalary[]
+  const replacementsArray: ReplacementWithSalary[] = Object.entries(replacements)
+    .filter(([, data]) => data.teacherId && data.teacherId !== '')
+    .map(([sessionId, data]) => {
+      const result = {
+        sessionId: Number(sessionId),
+        replacementTeacherId: Number(data.teacherId),
+        salary: data.salary ? Number(data.salary) : undefined,
+      };
+      console.log(`🔍 [LeaveApprovalModal] Session ${sessionId} ->`, result);
+      return result;
     });
-  };
+
+  console.log('🔍 [LeaveApprovalModal] Final replacementsArray:', replacementsArray);
+  console.log('🔍 [LeaveApprovalModal] cancelledSessions:', cancelledSessions);
+  console.log('🔍 [LeaveApprovalModal] comment:', comment);
+
+  onApprove({
+    approvalType,
+    replacements: replacementsArray,
+    cancelledSessions,
+    comment,
+  });
+};
 
   const handleReject = () => {
     if (onReject) onReject();
@@ -128,6 +171,13 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
   };
 
   const remainingSessions = totalSessions - processedSessions;
+
+  // 👉 Format số tiền
+  const formatCurrency = (amount: string) => {
+    const num = Number(amount);
+    if (isNaN(num) || num === 0) return '';
+    return new Intl.NumberFormat('vi-VN').format(num);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
@@ -170,7 +220,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
             </div>
           </section>
 
-          {/* Affected Sessions Table */}
+          {/* Affected Sessions Table - THÊM CỘT LƯƠNG */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold text-gray-900">Buổi học bị ảnh hưởng</h3>
@@ -190,6 +240,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Ngày/Giờ</th>
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Môn học</th>
                       <th className="px-5 py-3 text-sm font-semibold text-gray-600">Giáo viên thay thế</th>
+                      <th className="px-5 py-3 text-sm font-semibold text-gray-600 text-right">Lương (VNĐ)</th> {/* 👈 THÊM CỘT */}
                       {approvalType === 'flexible' && (
                         <th className="px-5 py-3 text-sm font-semibold text-gray-600 text-center">Hành động</th>
                       )}
@@ -199,7 +250,8 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                     {affectedSessions.map((session, idx) => {
                       const sessionId = String(session.sessionId);
                       const isCancelled = cancelledSessions.includes(sessionId);
-                      const isReplaced = replacements[sessionId] && replacements[sessionId] !== '';
+                      const replacementData = replacements[sessionId];
+                      const isReplaced = replacementData?.teacherId && replacementData.teacherId !== '';
                       const isProcessed = isCancelled || isReplaced;
                       
                       return (
@@ -220,8 +272,8 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                               </div>
                             ) : (
                               <select
-                                value={replacements[sessionId] || ''}
-                                onChange={(e) => handleReplaceChange(sessionId, e.target.value)}
+                                value={replacementData?.teacherId || ''}
+                                onChange={(e) => handleTeacherSelect(sessionId, e.target.value)}
                                 onFocus={() => loadAvailableTeachers(sessionId)}
                                 className={`w-full bg-white border rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ${
                                   isSubmitting || isCancelled
@@ -237,10 +289,33 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
                                   (availableTeachersMap[sessionId] || []).map((teacher) => (
                                     <option key={teacher.teacherId} value={String(teacher.teacherId)}>
                                       {teacher.teacherName} ({teacher.teacherEmail})
+                                      {teacher.defaultSalary && ` - ${formatCurrency(String(teacher.defaultSalary))}đ`}
                                     </option>
                                   ))
                                 )}
                               </select>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            {approvalType === 'full_leave' ? (
+                              <div className="text-gray-400 text-sm">-</div>
+                            ) : isCancelled ? (
+                              <div className="text-gray-400 text-sm">-</div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <DollarSign className="w-4 h-4 text-gray-400" />
+                                <input
+                                  type="number"
+                                  value={replacementData?.salary || ''}
+                                  onChange={(e) => {
+                                    const currentTeacherId = replacementData?.teacherId || '';
+                                    handleReplaceChange(sessionId, currentTeacherId, e.target.value);
+                                  }}
+                                  placeholder="Nhập lương..."
+                                  className="w-32 bg-white border border-gray-200 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-right"
+                                  disabled={isSubmitting || isCancelled || !replacementData?.teacherId}
+                                />
+                              </div>
                             )}
                           </td>
                           {approvalType === 'flexible' && (
@@ -380,7 +455,7 @@ export const LeaveApprovalModal: React.FC<LeaveApprovalModalProps> = ({
               isSubmitting ||
               (approvalType === 'flexible' && isFlexibleIncomplete)
             }
-            className="px-6 py-2 rounded-full btn-gradient from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Đang xử lý...' : 'Lưu xử lý'}
           </button>

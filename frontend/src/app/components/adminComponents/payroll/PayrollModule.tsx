@@ -1,5 +1,5 @@
 'use client';
-
+import { useOutletContext } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { X, Sparkles, RefreshCw } from 'lucide-react';
@@ -12,18 +12,19 @@ import PayrollListTab from './PayrollListTab';
 import PayrollWaitingTab from './PayrollWaitingTab';
 import PayrollFinalizedTab from './PayrollFinalizedTab';
 import PayrollMonthlyPreview from './PayrollMonthlyPreview';
-import type { PayrollFilter, PayrollStats as StatsType, PayrollListItem } from '../../../utils/types/payroll';
+import PayrollRejectedTab from './PayrollRejectedTab';
+import type {
+  PayrollFilter, PayrollStats as StatsType, PayrollListItem, TeacherPayrollRejectRequest, TeacherPaymentResponse
+} from '../../../utils/types/payroll';
 import { payrollApi } from '../../../utils/api/payroll.api';
 
-type TabType = 'preview' | 'list' | 'waiting' | 'finalized';
-
+type TabType = 'preview' | 'list' | 'waiting' | 'finalized' | 'rejected';
 interface PayrollModuleProps {
   mode?: 'create';
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 // Animation variants
-const containerVariants : Variants= {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -34,29 +35,29 @@ const containerVariants : Variants= {
   },
 };
 
-const modalOverlayVariants : Variants= {
+const modalOverlayVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.2 } },
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-const modalVariants : Variants= {
+const modalVariants: Variants = {
   hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
+  visible: {
+    opacity: 1,
+    scale: 1,
     y: 0,
     transition: { duration: 0.25, ease: 'easeOut' }
   },
-  exit: { 
-    opacity: 0, 
-    scale: 0.95, 
+  exit: {
+    opacity: 0,
+    scale: 0.95,
     y: 20,
     transition: { duration: 0.2, ease: 'easeIn' }
   },
 };
 
-const tabContentVariants : Variants= {
+const tabContentVariants: Variants = {
   enter: { opacity: 0, x: 20 },
   center: { opacity: 1, x: 0, transition: { duration: 0.25, ease: 'easeOut' } },
   exit: { opacity: 0, x: -20, transition: { duration: 0.2 } },
@@ -155,12 +156,12 @@ const AIInsightWidget: React.FC<{ stats: StatsType | null }> = ({ stats }) => {
       transition={{ delay: 0.2, duration: 0.4 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 via-white to-purple-50/30 backdrop-blur-sm border border-purple-200 shadow-lg shadow-purple-100/30 mb-6"
+      className="relative overflow-hidden rounded-2xl btn-gradient from-purple-50 via-white to-purple-50/30 backdrop-blur-sm border border-purple-200 shadow-lg shadow-purple-100/30 mb-6"
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 opacity-50" />
       <div className="relative px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-md shadow-purple-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl btn-gradient from-purple-500 to-purple-600 shadow-md shadow-purple-200">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -176,12 +177,12 @@ const AIInsightWidget: React.FC<{ stats: StatsType | null }> = ({ stats }) => {
           {insight.icon}
         </motion.div>
       </div>
-      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-purple-50/20 to-white/0 pointer-events-none" />
+      <div className="absolute inset-0 btn-gradient from-white/0 via-purple-50/20 to-white/0 pointer-events-none" />
     </motion.div>
   );
 };
 
-const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
+const PayrollModule: React.FC<PayrollModuleProps> = ({ mode }) => {
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [stats, setStats] = useState<StatsType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,11 +194,9 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
     year: new Date().getFullYear(),
     teacherName: ''
   });
+  const { setAlert } = useOutletContext<any>();
 
-  // Fetch stats từ API monthly-stats (GIỮ NGUYÊN LOGIC)
   const fetchStats = async () => {
-    const toast = showToast || ((msg: string, type?: any) => console.log(msg));
-
     try {
       setLoading(true);
       const currentMonth = filters.month || new Date().getMonth() + 1;
@@ -205,42 +204,20 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
 
       console.log('Fetching stats for:', currentMonth, currentYear);
 
-      let monthlyStats;
-      try {
-        monthlyStats = await payrollApi.getMonthlyStats(currentMonth, currentYear);
-        console.log('Monthly stats:', monthlyStats);
-      } catch (statsError) {
-        console.error('Error fetching monthly stats:', statsError);
-        monthlyStats = { month: currentMonth, year: currentYear, teacherCount: 0, sessionCount: 0, totalAmount: 0 };
-      }
-
-      let allPayrolls: PayrollListItem[] = [];
-      try {
-        allPayrolls = await payrollApi.getAllPayrolls();
-        console.log('All payrolls:', allPayrolls);
-      } catch (payrollsError) {
-        console.error('Error fetching payrolls:', payrollsError);
-        allPayrolls = [];
-      }
-
-      const statsData: StatsType = {
-        totalAmount: monthlyStats.totalAmount || 0,
-        totalPaidAmount: 0,
-        totalPayrolls: allPayrolls.length,
-        draftCount: allPayrolls.filter((p: PayrollListItem) => p.status === 'DRAFT').length,
-        waitingConfirmationCount: allPayrolls.filter((p: PayrollListItem) => p.status === 'WAITING_TEACHER_CONFIRMATION').length,
-        confirmedCount: allPayrolls.filter((p: PayrollListItem) => p.status === 'TEACHER_CONFIRMED').length,
-        finalizedCount: allPayrolls.filter((p: PayrollListItem) => p.status === 'FINALIZED').length,
-        paidCount: allPayrolls.filter((p: PayrollListItem) => p.status === 'PAID').length,
-        completionRate: allPayrolls.length > 0
-          ? Math.round((allPayrolls.filter((p: PayrollListItem) => p.status === 'FINALIZED' || p.status === 'PAID').length / allPayrolls.length) * 100)
-          : 0
-      };
+      // Sử dụng API mới của BE
+      const statsData = await payrollApi.getPayrollStats(currentMonth, currentYear);
+      console.log('Stats data:', statsData);
 
       setStats(statsData);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
-      toast('Không thể tải dữ liệu thống kê', 'error');
+      setAlert?.({
+        type: 'error',
+        message:
+          (error as any)?.response?.data?.message ||
+          (error as any)?.message ||
+          'Không thể tải dữ liệu thống kê'
+      });
       setStats({
         totalAmount: 0,
         totalPaidAmount: 0,
@@ -248,6 +225,7 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
         draftCount: 0,
         waitingConfirmationCount: 0,
         confirmedCount: 0,
+        rejectedCount: 0,
         finalizedCount: 0,
         paidCount: 0,
         completionRate: 0
@@ -267,7 +245,12 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
 
   const handlePayrollSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
-    if (showToast) showToast('Tạo bảng lương thành công', 'success');
+
+    setAlert?.({
+      type: 'success',
+      message: 'Tạo bảng lương thành công'
+    });
+
     setActiveTab('list');
   };
 
@@ -275,8 +258,6 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
-  const safeShowToast = showToast || ((msg: string, type?: any) => console.log(`[${type || 'info'}]: ${msg}`));
-  
   const handlePreviewMonthly = () => {
     setPreviewMonth({
       month: filters.month || new Date().getMonth() + 1,
@@ -287,7 +268,11 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
 
   const handleMonthlySuccess = () => {
     setRefreshTrigger(prev => prev + 1);
-    if (showToast) showToast('Tạo lương hàng loạt thành công', 'success');
+
+    setAlert?.({
+      type: 'success',
+      message: 'Tạo lương hàng loạt thành công'
+    });
   };
 
   // Show skeleton khi loading lần đầu
@@ -343,7 +328,6 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
                 >
                   <PayrollPreviewTab
                     filters={filters}
-                    showToast={safeShowToast}
                     onSuccess={handlePayrollSuccess}
                   />
                 </motion.div>
@@ -359,7 +343,6 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
                 >
                   <PayrollListTab
                     filters={filters}
-                    showToast={safeShowToast}
                     refreshTrigger={refreshTrigger}
                   />
                 </motion.div>
@@ -374,8 +357,28 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
                   exit="exit"
                 >
                   <PayrollWaitingTab
-                    showToast={safeShowToast}
                     refreshTrigger={refreshTrigger}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'rejected' && (
+                <motion.div
+                  key="rejected"
+                  variants={tabContentVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                >
+                  <PayrollRejectedTab
+                    refreshTrigger={refreshTrigger}
+                    onRegenerateSuccess={() => {
+                      setRefreshTrigger(prev => prev + 1);
+                      setAlert?.({
+                        type: 'success',
+                        message: 'Tái tạo bảng lương thành công'
+                      });
+                    }}
                   />
                 </motion.div>
               )}
@@ -389,7 +392,6 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
                   exit="exit"
                 >
                   <PayrollFinalizedTab
-                    showToast={safeShowToast}
                     refreshTrigger={refreshTrigger}
                   />
                 </motion.div>
@@ -451,13 +453,12 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode, showToast }) => {
                     <X className="h-5 w-5 text-slate-500" />
                   </button>
                 </div>
-                
+
                 {/* Modal Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
                   <PayrollMonthlyPreview
                     month={previewMonth.month}
                     year={previewMonth.year}
-                    showToast={safeShowToast}
                     onClose={() => setShowMonthlyPreview(false)}
                     onGenerate={handleMonthlySuccess}
                   />

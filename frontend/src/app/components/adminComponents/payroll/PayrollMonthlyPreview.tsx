@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Calendar, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  FileSpreadsheet, 
-  Loader2, 
+import {
+  Calendar,
+  Users,
+  DollarSign,
+  TrendingUp,
+  FileSpreadsheet,
+  Loader2,
   ChevronLeft,
   Eye,
   CheckCircle,
@@ -17,11 +17,11 @@ import {
 import { payrollApi } from '../../../utils/api/payroll.api';
 import type { MonthlyPayrollPreview, MonthlyPayrollTeacherDTO } from '../../../utils/types/payroll';
 import './payroll.css';
+import { useOutletContext } from 'react-router-dom';
 
 interface PayrollMonthlyPreviewProps {
   month: number;
   year: number;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onClose: () => void;
   onGenerate?: () => void;
 }
@@ -87,11 +87,11 @@ const PreviewSkeleton: React.FC = () => (
 );
 
 // Empty state component
-const EmptyPreviewState: React.FC<{ month: number; year: number; onPreview: () => void; loading: boolean }> = ({ 
-  month, 
-  year, 
-  onPreview, 
-  loading 
+const EmptyPreviewState: React.FC<{ month: number; year: number; onPreview: () => void; loading: boolean }> = ({
+  month,
+  year,
+  onPreview,
+  loading
 }) => (
   <motion.div
     initial={{ opacity: 0, scale: 0.95 }}
@@ -105,7 +105,7 @@ const EmptyPreviewState: React.FC<{ month: number; year: number; onPreview: () =
     </div>
     <h3 className="text-xl font-semibold text-slate-700 mb-2">Xem trước lương tháng</h3>
     <p className="text-sm text-slate-500 mb-2">
-      Tháng <span className="font-semibold text-purple-600">{month}</span> / 
+      Tháng <span className="font-semibold text-purple-600">{month}</span> /
       Năm <span className="font-semibold text-purple-600">{year}</span>
     </p>
     <p className="text-xs text-slate-400 max-w-sm mx-auto mb-6">
@@ -116,7 +116,7 @@ const EmptyPreviewState: React.FC<{ month: number; year: number; onPreview: () =
       whileTap={{ scale: 0.98 }}
       onClick={onPreview}
       disabled={loading}
-      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md shadow-purple-200 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold btn-gradient from-purple-500 to-purple-600 text-white shadow-md shadow-purple-200 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? (
         <>
@@ -214,14 +214,13 @@ const TeacherRow: React.FC<{ teacher: MonthlyPayrollTeacherDTO; index: number }>
 const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
   month,
   year,
-  showToast,
   onClose,
   onGenerate
 }) => {
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState<MonthlyPayrollPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-
+  const { setAlert } = useOutletContext<any>();
   const handlePreview = async () => {
     setLoading(true);
     try {
@@ -229,10 +228,16 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
       console.log('Monthly preview data:', data);
       setPreviewData(data);
       setShowPreview(true);
-      showToast(`Tìm thấy ${data.totalTeachers} giáo viên có lương`, 'success');
+      setAlert?.({
+        type: 'success',
+        message: `Tìm thấy ${data.totalTeachers} giáo viên có lương`
+      });
     } catch (error: any) {
       console.error('Preview error:', error);
-      showToast(error?.message || 'Không thể xem trước lương tháng', 'error');
+      setAlert?.({
+        type: 'error',
+        message: error?.message || 'Không thể xem trước lương tháng'
+      });
     } finally {
       setLoading(false);
     }
@@ -242,12 +247,18 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
     setLoading(true);
     try {
       const result = await payrollApi.generateMonthlyPayroll(month, year);
-      showToast(`Đã tạo thành công ${result.length} bảng lương`, 'success');
+      setAlert?.({
+        type: 'success',
+        message: `Đã tạo thành công ${result.length} bảng lương`
+      });
       if (onGenerate) onGenerate();
       onClose();
     } catch (error: any) {
       console.error('Generate error:', error);
-      showToast(error?.message || 'Không thể tạo lương hàng loạt', 'error');
+      setAlert?.({
+        type: 'error',
+        message: error?.message || 'Không thể tạo lương hàng loạt'
+      });
     } finally {
       setLoading(false);
     }
@@ -310,7 +321,7 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
           color="blue"
           index={0}
         />
-        
+
         <KPICard
           title="Tổng số buổi"
           value={previewData.teachers.reduce((sum, t) => sum + t.totalSessions, 0)}
@@ -319,7 +330,7 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
           color="emerald"
           index={1}
         />
-        
+
         <KPICard
           title="Tổng lương"
           value={`${totalInMillions}M`}
@@ -328,7 +339,7 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
           color="purple"
           index={2}
         />
-        
+
         <KPICard
           title="Trung bình/GV"
           value={formatCurrency(averageAmount)}
@@ -358,7 +369,7 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
             </div>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-white border-b border-slate-100">
@@ -378,7 +389,7 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
             </tbody>
           </table>
         </div>
-        
+
         {previewData.teachers.length === 0 && (
           <div className="text-center py-12">
             <p className="text-slate-400">Không có giáo viên nào trong tháng này</p>
@@ -396,13 +407,13 @@ const PayrollMonthlyPreview: React.FC<PayrollMonthlyPreviewProps> = ({
         >
           Quay lại
         </motion.button>
-        
+
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleGenerateMonthly}
           disabled={loading}
-          className="px-6 py-2.5 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-200 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="px-6 py-2.5 rounded-xl font-semibold btn-gradient from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-200 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? (
             <>

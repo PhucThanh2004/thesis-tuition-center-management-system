@@ -85,6 +85,7 @@ export interface SessionContentResponse {
   displayHomework: string | null;
   isFollowingPlan: boolean;
   plannedTopic: string | null;
+   plannedSessionDetailId?: number | null;
   deviationReason: string | null;
   noteForNextSession: string | null;
 }

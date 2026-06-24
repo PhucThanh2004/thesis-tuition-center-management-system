@@ -1,33 +1,30 @@
 // src/app/components/teachers/QuickActions.tsx
 import React from 'react';
-import { FileText, Calendar, Bell, Download } from 'lucide-react';
-
-interface QuickAction {
-  icon: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-}
+import { Users, Calendar, Bell, Download } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface QuickActionsProps {
-  onExport?: () => void;  // 👈 add prop for export
+  onExport?: () => void;
 }
 
 const QuickActions: React.FC<QuickActionsProps> = ({ onExport }) => {
-  const actions: QuickAction[] = [
+  const navigate = useNavigate();
+
+  const actions = [
     {
-      icon: <FileText className="w-5 h-5" />,
-      label: 'Báo cáo',
-      onClick: () => console.log('Báo cáo clicked')
+      icon: <Users className="w-5 h-5" />,
+      label: 'Lớp học',
+      onClick: () => navigate('/admin/class')
     },
     {
       icon: <Calendar className="w-5 h-5" />,
       label: 'Lịch học',
-      onClick: () => console.log('Lịch học clicked')
+      onClick: () => navigate('/admin/schedule')
     },
     {
       icon: <Bell className="w-5 h-5" />,
       label: 'Thông báo',
-      onClick: () => console.log('Thông báo clicked')
+      onClick: () => navigate('/admin/announcement')
     },
     {
       icon: <Download className="w-5 h-5" />,
@@ -37,7 +34,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onExport }) => {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm p-5">
       <h2 className="text-sm font-bold text-slate-700 mb-4">Thao tác nhanh</h2>
       <div className="grid grid-cols-2 gap-3">
         {actions.map((action, index) => (

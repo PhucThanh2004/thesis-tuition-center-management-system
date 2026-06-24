@@ -1,3 +1,5 @@
+// activity-log.ts
+
 export type ActivityActionType =
   | "CREATE"
   | "UPDATE"
@@ -6,11 +8,14 @@ export type ActivityActionType =
   | "REJECT"
   | "LOGIN"
   | "LOGOUT"
-  | "CHECKIN";
+  | "CHECKIN"
+  | "VIEW";
 
 export type ActivityTargetType =
   | "STUDENT"
+  | "STUDENT_LIST"
   | "TEACHER"
+  | "TEACHER_LIST"
   | "COURSE"
   | "CLASSROOM"
   | "ANNOUNCEMENT"
@@ -27,19 +32,16 @@ export interface ActivityLogMeta {
 export interface ActivityLog {
   id: number;
 
-  userId: number
+  userId: number;
   userName: string;
   userImage: string | null;
 
   actionType: ActivityActionType;
-
   targetType: ActivityTargetType;
-
   targetId: number;
 
   description: string;
-
   meta: string | null;
-
   createdAt: string;
+  isRead: boolean;
 }

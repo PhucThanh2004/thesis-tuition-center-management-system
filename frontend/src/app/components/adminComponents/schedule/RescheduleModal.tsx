@@ -1,4 +1,4 @@
-import { Clock, RefreshCw, XCircle, Bell, Phone, FileText, ChevronDown, ChevronUp, UserCheck, CalendarX, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, RefreshCw, XCircle, Bell, Phone, FileText, ChevronDown, ChevronUp, UserCheck, CalendarX, CheckCircle, AlertCircle, BookOpen, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sessionApi } from "../../../utils/api";
 import type { SessionDetail } from "../../../utils/types/session";
@@ -21,6 +21,10 @@ export const RescheduleModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllStudents, setShowAllStudents] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    students: true,
+    content: true,
+  });
 
   useEffect(() => {
     if (isOpen && sessionId !== undefined && sessionId !== null) {
@@ -85,7 +89,8 @@ export const RescheduleModal = ({
     const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
       weekday: 'long',
       day: 'numeric',
-      month: 'numeric'
+      month: 'numeric',
+      year: 'numeric'
     });
     return `${formattedDate}, ${startTime.substring(0, 5)} - ${endTime.substring(0, 5)} (${sessionDetail?.totalMinutes || 0} phút)`;
   };
@@ -168,11 +173,15 @@ export const RescheduleModal = ({
     console.log("Thông báo cho phụ huynh về buổi học:", sessionId);
   };
 
+  const toggleSection = (section: 'students' | 'content') => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex overflow-hidden">
         <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-        <div className="ml-auto w-[420px] h-full bg-white flex flex-col relative z-10 shadow-xl">
+        <div className="ml-auto w-[480px] h-full bg-white flex flex-col relative z-10 shadow-xl">
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -188,7 +197,7 @@ export const RescheduleModal = ({
     return (
       <div className="fixed inset-0 z-50 flex overflow-hidden">
         <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-        <div className="ml-auto w-[420px] h-full bg-white flex flex-col relative z-10 shadow-xl">
+        <div className="ml-auto w-[480px] h-full bg-white flex flex-col relative z-10 shadow-xl">
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-6">
               <XCircle size={48} className="text-red-500 mx-auto mb-4" />
@@ -213,12 +222,15 @@ export const RescheduleModal = ({
   const isTeacherAlreadyAttended = sessionDetail.teacherAttendance?.status === 'present';
   const hasTeacherRequestedLeave = sessionDetail.teacherAttendance?.status === 'absent';
 
+  // Kiểm tra xem có nội dung buổi học không
+  const hasContent = sessionDetail.displayTopic || sessionDetail.displayContent || sessionDetail.displayHomework;
+
   return (
     <div className="fixed inset-0 z-50 flex overflow-hidden">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       <div className="ml-auto w-[480px] h-full bg-white flex flex-col relative z-10 shadow-2xl animate-slide-in">
-        {/* HEADER - Cải tiến */}
+        {/* HEADER - Thêm thông tin phòng học */}
         <div className="relative flex items-start justify-between pt-6 pb-4 px-6 border-b">
           <div className="flex-1">
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(sessionDetail.status)}`}>
@@ -232,13 +244,22 @@ export const RescheduleModal = ({
             <h2 className="mt-3 text-2xl font-bold text-gray-900">
               {sessionDetail.subjectName}
             </h2>
-            <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-              <Clock size={14} className="stroke-[1.5]" />
-              <span>{formatDateTime(
-                sessionDetail.sessionDate,
-                sessionDetail.startTime,
-                sessionDetail.endTime
-              )}</span>
+            {/* Thông tin thời gian và phòng học chung */}
+            <div className="flex flex-col gap-1 mt-2">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Clock size={14} className="stroke-[1.5]" />
+                <span>{formatDateTime(
+                  sessionDetail.sessionDate,
+                  sessionDetail.startTime,
+                  sessionDetail.endTime
+                )}</span>
+              </div>
+              {sessionDetail.room && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <MapPin size={14} className="stroke-[1.5]" />
+                  <span>{sessionDetail.room.name}</span>
+                </div>
+              )}
             </div>
           </div>
           <button 
@@ -253,7 +274,7 @@ export const RescheduleModal = ({
 
         {/* CONTENT */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          {/* Teacher Card - Cải tiến */}
+          {/* Teacher Card */}
           <div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">GIÁO VIÊN GIẢNG DẠY</p>
             {sessionDetail.teacher ? (
@@ -290,9 +311,12 @@ export const RescheduleModal = ({
             )}
           </div>
 
-          {/* Students Section - Cải tiến */}
+          {/* Students Section - Đặt lên trước */}
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <button 
+              onClick={() => toggleSection('students')}
+              className="w-full flex justify-between items-center mb-2"
+            >
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">DANH SÁCH HỌC SINH</p>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
@@ -303,87 +327,165 @@ export const RescheduleModal = ({
                     <XCircle size={10} /> {absentCount}
                   </span>
                 )}
+                {expandedSections.students ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
               </div>
-            </div>
+            </button>
             
-            <div className="space-y-2 pr-1">
-              {displayedStudents.map((student) => {
-                const colors = getRandomColor(student.fullName);
-                const isPresent = student.attendanceStatus === 'present';
-                const isLate = student.attendanceStatus === 'late';
-                const isAbsent = student.attendanceStatus === 'absent';
+            {expandedSections.students && (
+              <div className="space-y-2 pr-1">
+                {displayedStudents.map((student) => {
+                  const colors = getRandomColor(student.fullName);
+                  const isPresent = student.attendanceStatus === 'present';
+                  const isLate = student.attendanceStatus === 'late';
+                  const isAbsent = student.attendanceStatus === 'absent';
+                  
+                  return (
+                    <div key={student.studentId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <div className={`w-8 h-8 flex items-center justify-center rounded-full ${colors.bg}`}>
+                        <span className={`text-xs font-semibold ${colors.text}`}>
+                          {getInitials(student.fullName)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 truncate">{student.fullName}</p>
+                        {student.attendanceNote && (
+                          <p className="text-xs text-gray-500 truncate">{student.attendanceNote}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${getAttendanceColor(student.attendanceStatus)}`} />
+                        <span className={`text-xs font-medium ${
+                          isPresent ? 'text-green-600' :
+                          isLate ? 'text-yellow-600' :
+                          isAbsent ? 'text-red-600' : 'text-gray-400'
+                        }`}>
+                          {isPresent ? 'Có mặt' :
+                           isLate ? 'Đi muộn' :
+                           isAbsent ? 'Vắng mặt' : 'Chưa điểm danh'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
                 
-                return (
-                  <div key={student.studentId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <div className={`w-8 h-8 flex items-center justify-center rounded-full ${colors.bg}`}>
-                      <span className={`text-xs font-semibold ${colors.text}`}>
-                        {getInitials(student.fullName)}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900 truncate">{student.fullName}</p>
-                      {student.attendanceNote && (
-                        <p className="text-xs text-gray-500 truncate">{student.attendanceNote}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${getAttendanceColor(student.attendanceStatus)}`} />
-                      <span className={`text-xs font-medium ${
-                        isPresent ? 'text-green-600' :
-                        isLate ? 'text-yellow-600' :
-                        isAbsent ? 'text-red-600' : 'text-gray-400'
-                      }`}>
-                        {isPresent ? 'Có mặt' :
-                         isLate ? 'Đi muộn' :
-                         isAbsent ? 'Vắng mặt' : 'Chưa điểm danh'}
-                      </span>
-                    </div>
+                {totalStudents > 3 && (
+                  <button 
+                    onClick={() => setShowAllStudents(!showAllStudents)}
+                    className="w-full flex items-center justify-center gap-1 text-xs text-blue-600 mt-3 py-2 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    {showAllStudents ? (
+                      <>
+                        <ChevronUp size={14} /> Thu gọn
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={14} /> Xem thêm {remainingCount} học sinh
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {totalStudents === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <FileText size={32} className="mx-auto mb-2 stroke-[1.5]" />
+                    <p className="text-sm">Chưa có học sinh đăng ký</p>
                   </div>
-                );
-              })}
-              
-              {totalStudents > 3 && (
-                <button 
-                  onClick={() => setShowAllStudents(!showAllStudents)}
-                  className="w-full flex items-center justify-center gap-1 text-xs text-blue-600 mt-3 py-2 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  {showAllStudents ? (
-                    <>
-                      <ChevronUp size={14} /> Thu gọn
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} /> Xem thêm {remainingCount} học sinh
-                    </>
-                  )}
-                </button>
-              )}
-              
-              {totalStudents === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <FileText size={32} className="mx-auto mb-2 stroke-[1.5]" />
-                  <p className="text-sm">Chưa có học sinh đăng ký</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Room Info - Cải tiến */}
-          <div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">PHÒNG HỌC</p>
-            {sessionDetail.room ? (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <p className="font-semibold text-gray-900">{sessionDetail.room.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Sức chứa: {sessionDetail.room.seatCapacity} người</p>
-              </div>
-            ) : (
-              <div className="p-3 bg-gray-50 rounded-xl text-gray-400 text-sm">
-                Chưa có thông tin phòng học
+                )}
               </div>
             )}
           </div>
 
-          {/* Notes */}
+          {/* NỘI DUNG BUỔI HỌC - Đặt xuống dưới danh sách học sinh */}
+          <div>
+            <button 
+              onClick={() => toggleSection('content')}
+              className="w-full flex justify-between items-center mb-2"
+            >
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">NỘI DUNG BUỔI HỌC</p>
+              {expandedSections.content ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+            </button>
+            
+            {expandedSections.content && (
+              <div className="space-y-3">
+                {/* Badge trạng thái dạy đúng/lệch kế hoạch */}
+                <div className={`flex items-center gap-2 p-3 rounded-xl ${
+                  sessionDetail.isFollowingPlan
+                    ? 'bg-emerald-50 border border-emerald-200'
+                    : 'bg-amber-50 border border-amber-200'
+                }`}>
+                  {sessionDetail.isFollowingPlan ? (
+                    <CheckCircle size={16} className="text-emerald-600" />
+                  ) : (
+                    <AlertCircle size={16} className="text-amber-600" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    sessionDetail.isFollowingPlan ? 'text-emerald-700' : 'text-amber-700'
+                  }`}>
+                    {sessionDetail.isFollowingPlan ? 'Dạy đúng kế hoạch' : 'Dạy lệch kế hoạch'}
+                  </span>
+                </div>
+
+                {/* Chủ đề */}
+                {sessionDetail.displayTopic && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">CHỦ ĐỀ</label>
+                    <p className="text-sm text-gray-800 mt-1">{sessionDetail.displayTopic}</p>
+                  </div>
+                )}
+
+                {/* Nội dung */}
+                {sessionDetail.displayContent && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">NỘI DUNG</label>
+                    <div className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{sessionDetail.displayContent}</div>
+                  </div>
+                )}
+
+                {/* Bài tập */}
+                {sessionDetail.displayHomework && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">BÀI TẬP</label>
+                    <p className="text-sm text-gray-700 mt-1">{sessionDetail.displayHomework}</p>
+                  </div>
+                )}
+
+                {/* Kế hoạch tham khảo (khi dạy lệch) */}
+                {!sessionDetail.isFollowingPlan && sessionDetail.plannedTopic && (
+                  <div className="p-3 bg-gray-100 rounded-lg border-l-2 border-gray-400">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">KẾ HOẠCH THAM KHẢO</label>
+                    <p className="text-sm text-gray-500 line-through mt-1">{sessionDetail.plannedTopic}</p>
+                  </div>
+                )}
+
+                {/* Lý do thay đổi */}
+                {sessionDetail.deviationReason && (
+                  <div className="p-3 bg-amber-50 rounded-lg">
+                    <label className="text-xs font-medium text-amber-600 uppercase tracking-wider">LÝ DO THAY ĐỔI</label>
+                    <p className="text-sm text-amber-700 mt-1 italic">{sessionDetail.deviationReason}</p>
+                  </div>
+                )}
+
+                {/* Ghi chú cho buổi sau */}
+                {sessionDetail.noteForNextSession && (
+                  <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                    <label className="text-xs font-medium text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                      <Clock size={12} /> GHI CHÚ CHO BUỔI SAU
+                    </label>
+                    <p className="text-sm text-indigo-700 mt-1">{sessionDetail.noteForNextSession}</p>
+                  </div>
+                )}
+
+                {!hasContent && (
+                  <div className="text-center py-6 bg-gray-50 rounded-lg">
+                    <BookOpen size={24} className="text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Chưa cập nhật nội dung buổi học</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Notes - Ghi chú giáo viên */}
           {sessionDetail.teacherAttendance?.note && (
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">GHI CHÚ GIÁO VIÊN</p>
@@ -392,34 +494,9 @@ export const RescheduleModal = ({
               </div>
             </div>
           )}
-
-          {sessionDetail.studentAttendances?.some(s => s.attendanceNote) && (
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">GHI CHÚ HỌC SINH</p>
-              <div className="space-y-2">
-                {sessionDetail.studentAttendances
-                  .filter(s => s.attendanceNote)
-                  .slice(0, showAllStudents ? undefined : 2)
-                  .map((student) => (
-                    <div key={student.studentId} className="p-2 bg-gray-50 rounded-lg text-sm">
-                      <span className="font-semibold text-gray-700">{student.fullName}:</span>{' '}
-                      <span className="text-gray-600">{student.attendanceNote}</span>
-                    </div>
-                  ))}
-                {sessionDetail.studentAttendances.filter(s => s.attendanceNote).length > 2 && !showAllStudents && (
-                  <button 
-                    onClick={() => setShowAllStudents(true)}
-                    className="text-xs text-blue-600 hover:text-blue-700"
-                  >
-                    Xem thêm ghi chú...
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* FOOTER - Cải tiến, ẩn nút thông báo nếu là teacher */}
+        {/* FOOTER */}
         <div className="p-6 border-t bg-gray-50">
           {isTeacher ? (
             // Teacher buttons
@@ -478,7 +555,6 @@ export const RescheduleModal = ({
                   <XCircle size={18} /> Hủy ca học
                 </button>
               </div>
-              {/* Admin vẫn giữ nút thông báo */}
               <button 
                 onClick={handleNotify}
                 className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 rounded-xl text-white font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"

@@ -1,16 +1,10 @@
 import { useState, useEffect } from "react";
 import {
-  Layers,
-  PlayCircle,
-  Inbox,
-  CalendarX,
   Search,
   Plus,
-  Loader2,
   TrendingUp,
   Users,
   Clock,
-  AlertCircle,
   Sparkles,
   ArrowRight,
   Shield,
@@ -18,7 +12,13 @@ import {
 import type { SubjectResponse } from "../../../utils/types/subject";
 import { subjectApi } from "../../../utils/api";
 
-export const DashboardSummarySection = ({ onAdd }: { onAdd: () => void }) => {
+export const DashboardSummarySection = ({ 
+  onAdd,
+  onViewDetails  // Thêm prop mới
+}: { 
+  onAdd: () => void;
+  onViewDetails: () => void;  // Khai báo kiểu dữ liệu
+}) => {
   const [searchValue, setSearchValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("");
@@ -93,82 +93,86 @@ export const DashboardSummarySection = ({ onAdd }: { onAdd: () => void }) => {
     fetchData();
   }, []);
 
+  // Hàm xử lý khi click vào ô tìm kiếm
+  const handleSearchFocus = () => {
+    onViewDetails(); // Cuộn xuống danh sách lớp học
+  };
+
+  // Hàm xử lý khi thay đổi giá trị tìm kiếm
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+    onViewDetails(); // Cuộn xuống danh sách lớp học khi gõ tìm kiếm
+  };
+
   return (
     <div className="w-full flex flex-col space-y-6">
-      {/* Header Section - Glassmorphism Style */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-white via-indigo-50 to-white backdrop-blur-xl rounded-3xl shadow-sm border border-white/50">
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-200 via-indigo-200 to-transparent rounded-full blur-3xl -mr-48 -mt-48"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-purple-200 via-pink-100 to-transparent rounded-full blur-3xl -ml-40 -mb-40"></div>
+      {/* Header Section - Giống AdminHomePage */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            <Sparkles size={14} className="text-indigo-500" />
+            <span className="text-indigo-500 text-xs font-medium">Quản trị viên</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-full">
+            <Clock size={14} className="text-gray-500" />
+            <span className="text-gray-600 text-sm">{currentTime}</span>
+          </div>
+        </div>
 
-        <div className="relative px-6 py-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-sm">
-                  <Sparkles size={14} className="text-indigo-600" />
-                  <span className="text-indigo-600 text-xs font-medium">Quản trị viên</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-full">
-                  <Clock size={14} className="text-gray-500" />
-                  <span className="text-gray-600 text-sm">{currentTime}</span>
-                </div>
-              </div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 className="text-gray-900 text-3xl lg:text-4xl font-bold tracking-tight">
+              {greeting}, <span className="bg-clip-text gradient-text">Quản trị viên!</span>
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
+              <span>Chào mừng bạn quay trở lại</span>
+              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+              <span className="flex items-center gap-1">
+                <TrendingUp size={14} className="text-blue-500" />
+                Đây là trang quản lý lớp học
+              </span>
+            </p>
+          </div>
 
-              <div>
-                <h1 className="text-gray-900 text-3xl lg:text-4xl font-bold tracking-tight">
-                  {greeting}, <span className="gradient-text bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Quản trị viên!</span>
-                </h1>
-                <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
-                  <span>Chào mừng bạn quay trở lại</span>
-                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <TrendingUp size={14} className="text-blue-500" />
-                    Hôm nay có {stats.active} lớp đang hoạt động
-                  </span>
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input
+                type="search"
+                value={searchValue}
+                onFocus={handleSearchFocus}  // Thêm sự kiện onFocus
+                onChange={handleSearchChange}  // Thay đổi onChange
+                placeholder="Tìm kiếm lớp học..."
+                className="peer w-80 pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm rounded-xl text-sm text-gray-700 outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-400/50 transition-all placeholder:text-gray-400"
+              />
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors peer-focus:text-indigo-500"
+              />
             </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <input
-                  type="search"
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  placeholder="Tìm kiếm lớp học..."
-                  className="peer w-80 pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm rounded-xl text-sm text-gray-700 outline-none border border-gray-200 focus:ring-1 focus:ring-indigo-300 transition-all placeholder:text-gray-400"
-                />
-
-                <Search
-                  size={18}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors peer-focus:text-indigo-300"
-                />
-              </div>
-              <button
-                onClick={onAdd}
-                className="group relative flex items-center gap-2 px-5 py-2.5 btn-gradient rounded-xl text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-              >
-                <Plus size={18} className="text-white group-hover:rotate-90 transition-transform duration-300" />
-                <span >
-                  Thêm lớp mới
-                </span>
-              </button>
-            </div>
+            <button
+              onClick={onAdd}
+              className="group relative flex items-center gap-2 px-5 py-2.5 btn-gradient rounded-xl text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              <Plus size={18} className="text-white group-hover:rotate-90 transition-transform duration-300" />
+              <span>Thêm lớp mới</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Quick Stats & Insights - Cân bằng chiều cao */}
+      {/* Quick Stats & Insights - Style giống AdminHomePage */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left Section - Tổng quan nhanh */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Users size={18} className="text-violet-500" />
+              <Users size={18} className="text-indigo-500" />
               <h3 className="font-semibold text-gray-900">Tổng quan nhanh</h3>
             </div>
-            <button className="text-xs text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1 group">
+            <button 
+              onClick={onViewDetails}  // Thêm sự kiện click
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 group"
+            >
               <span>Xem chi tiết</span>
               <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
             </button>
@@ -187,7 +191,7 @@ export const DashboardSummarySection = ({ onAdd }: { onAdd: () => void }) => {
         </div>
 
         {/* Right Section - Trạng thái hệ thống */}
-        <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-5 shadow-md border border-white/50 flex flex-col">
+        <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-5 shadow-sm border border-white/50 flex flex-col">
           <div className="flex items-center gap-3 mb-2">
             <div className="relative">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
@@ -207,7 +211,10 @@ export const DashboardSummarySection = ({ onAdd }: { onAdd: () => void }) => {
               <span className="font-medium text-green-600">98%</span>
             </div>
             <div className="w-full bg-white/50 rounded-full h-2 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full w-[98%]"></div>
+              <div
+                className="h-2 rounded-full w-[98%]"
+                style={{ background: 'linear-gradient(to right, #22c55e, #10b981)' }}
+              ></div>
             </div>
           </div>
 

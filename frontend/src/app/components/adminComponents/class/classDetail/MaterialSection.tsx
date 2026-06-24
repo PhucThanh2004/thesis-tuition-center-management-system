@@ -4,7 +4,7 @@ import { Search, ArrowRight, Sparkles } from "lucide-react";
 import { materialApi } from "../../../../utils/api/material.api";
 import type { MaterialSectionProps } from "./material/types";
 import { filterButtons } from "./material/types";
-import { MaterialCard, StorageCard, ActivityCard, AISuggestionCard, HelpCard } from "./material/Cards";
+import { MaterialCard, StorageCard, AISuggestionCard, HelpCard } from "./material/Cards";
 import { FloatingUploadButton, UploadModal, EditModal } from "./material/Modals";
 import type { Material } from "../../../../utils/types/material";
 import { useOutletContext } from "react-router-dom";
@@ -321,7 +321,6 @@ export const MaterialSection = memo(({ subject, isTeacher = false }: MaterialSec
                     {/* Right Column - Sidebar */}
                     <div className="lg:col-span-3 space-y-6">
                         <StorageCard materials={materials} />
-                        <ActivityCard />
                         <AISuggestionCard />
                         <HelpCard />
                     </div>

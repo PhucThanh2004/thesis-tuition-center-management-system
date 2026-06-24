@@ -32,7 +32,7 @@ export const subjectApi = {
   },
 
   // CREATE SUBJECT
-  create(data: CreateSubjectRequest): Promise<{
+ create(data: CreateSubjectRequest): Promise<{
     success: boolean
     message: string
     data: Subject
@@ -75,6 +75,19 @@ export const subjectApi = {
     }
     else if (data.imageUrl) {
       formData.append('imageUrl', data.imageUrl)
+    }
+
+    // === THÊM CÁC FIELD BILLING ===
+    if (data.billingType) {
+      formData.append('billingType', data.billingType)
+    }
+
+    if (data.paymentPlanType) {
+      formData.append('paymentPlanType', data.paymentPlanType)
+    }
+
+    if (data.installmentCount !== undefined && data.installmentCount !== null) {
+      formData.append('installmentCount', String(data.installmentCount))
     }
 
     return axios.post('/subjects', formData, {

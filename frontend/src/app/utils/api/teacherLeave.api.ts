@@ -12,7 +12,6 @@ import type {
   AvailableReplacementTeacher,
   TeacherLeaveApproveRequest,
   PreviewReplacementPlanRequest,
-  ReplacementSelection,
   WeeklyAbsentTeacherResponse,
   ReplacementSession
 } from '../types/teacherLeave';
@@ -90,6 +89,15 @@ export const teacherLeaveApi = {
 
   // Duyệt / từ chối đơn
   async approve(id: number, payload: TeacherLeaveApproveRequest): Promise<ApiResponse> {
+    // 👉 LOG: Kiểm tra payload trước khi gửi
+    console.log('🔍 [API] approve payload:', JSON.stringify(payload, null, 2));
+    console.log('🔍 [API] replacements detail:', payload.replacements?.map(r => ({
+      sessionId: r.sessionId,
+      replacementTeacherId: r.replacementTeacherId,
+      salary: r.salary,
+      hasSalary: r.salary !== undefined && r.salary !== null
+    })));
+
     logRequest('PUT', `/teacher-leaves/${id}/status`, undefined, payload);
     const response: any = await axios.put(`/teacher-leaves/${id}/status`, payload);
     logResponse('PUT', `/teacher-leaves/${id}/status`, response);
@@ -109,15 +117,29 @@ export const teacherLeaveApi = {
     logRequest('GET', `/teacher-leaves/${leaveId}/affected-sessions`);
     const response: any = await axios.get(`/teacher-leaves/${leaveId}/affected-sessions`);
     logResponse('GET', `/teacher-leaves/${leaveId}/affected-sessions`, response);
+
+    // ✅ Log chi tiết để debug
+    console.log('📊 getAffectedSessions response data:', JSON.stringify(response.data, null, 2));
+
     return response.data || [];
   },
 
   // Gán giáo viên thay thế cho một affected session
-  async assignReplacement(affectedSessionId: number, replacementTeacherId: number, adminNote?: string): Promise<ApiResponse> {
-    logRequest('PUT', `/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, undefined, { replacementTeacherId, adminNote: adminNote || null });
+  async assignReplacement(
+    affectedSessionId: number,
+    replacementTeacherId: number,
+    adminNote?: string,
+    replacementSalary?: number  // 👈 THÊM MỚI
+  ): Promise<ApiResponse> {
+    logRequest('PUT', `/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, undefined, {
+      replacementTeacherId,
+      adminNote: adminNote || null,
+      replacementSalary: replacementSalary || null  // 👈 Gửi lên BE
+    });
     const response: any = await axios.put(`/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, {
       replacementTeacherId,
       adminNote: adminNote || null,
+      replacementSalary: replacementSalary || null,
     });
     logResponse('PUT', `/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, response);
     return response;
@@ -210,12 +232,18 @@ export const teacherLeaveApi = {
   },
 
   // ✅ Assign teacher to session (chuyển từ PENDING → ASSIGNED)
-  async assignTeacherToSession(affectedSessionId: number, replacementTeacherId: number): Promise<ApiResponse> {
+  async assignTeacherToSession(
+    affectedSessionId: number,
+    replacementTeacherId: number,
+    replacementSalary?: number
+  ): Promise<ApiResponse> {
     logRequest('PUT', `/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, undefined, {
-      replacementTeacherId
+      replacementTeacherId,
+      replacementSalary: replacementSalary || null
     });
     const response: any = await axios.put(`/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, {
-      replacementTeacherId
+      replacementTeacherId,
+      replacementSalary: replacementSalary || null
     });
     logResponse('PUT', `/teacher-leaves/affected-sessions/${affectedSessionId}/assign`, response);
     return response;

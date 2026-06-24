@@ -20,6 +20,10 @@ import {
   Calendar,
   Award,
   Activity,
+  BookOpen,
+  FileText,
+  ClipboardList,
+  AlertCircle,
 } from "lucide-react";
 import clsx from "clsx";
 import type { Subject } from "../../../../utils/types/subject";
@@ -30,6 +34,7 @@ import type { AttendanceResponse, StudentAttendance, AttendanceItem } from "../.
 import type { TeacherAttendance, TeacherAttendanceItem, TeacherAttendanceResponse } from "../../../../utils/types/teacher-attendance";
 import { teacherAttendanceApi } from "../../../../utils/api/teacherAttendance.api";
 import { useOutletContext } from "react-router-dom";
+import { SessionContentModal } from "./SessionContentModal";
 
 // ============================================================================
 // TYPES
@@ -46,8 +51,8 @@ interface Student {
   note?: string | null;
 }
 
-interface Session {
-  id: string;
+export interface Session {
+  id: number;
   title: string;
   date: string;
   time: string;
@@ -55,6 +60,17 @@ interface Session {
   isCurrent?: boolean;
   isCompleted?: boolean;
   status?: string;
+}
+
+// Interface cho nội dung buổi học
+interface SessionContent {
+  displayTopic: string | null;
+  displayContent: string | null;
+  displayHomework: string | null;
+  isFollowingPlan: boolean;
+  plannedTopic: string | null;
+  deviationReason: string | null;
+  noteForNextSession: string | null;
 }
 
 // ============================================================================
@@ -115,7 +131,243 @@ const useCountUp = (end: number, duration = 1000) => {
 };
 
 // ============================================================================
-// COMPONENTS
+// NEW COMPONENT: Session Content Card
+// ============================================================================
+
+const SessionContentCard: React.FC<{
+  sessionId: number;
+  onEdit?: () => void;
+  isCanceled?: boolean;
+}> = ({ sessionId, onEdit, isCanceled = false }) => {
+  const [content, setContent] = useState<SessionContent | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { setAlert } = useOutletContext<any>();
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      if (!sessionId) return;
+      
+      try {
+        setLoading(true);
+        const data = await sessionApi.getSessionContent(sessionId);
+        setContent(data);
+      } catch (error) {
+        console.error("Error fetching session content:", error);
+        setAlert?.({
+          type: "error",
+          message: "Không thể tải nội dung buổi học!",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, [sessionId, setAlert]);
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-900/80 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+        <div className="animate-pulse space-y-3">
+          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="space-y-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!content) return null;
+
+  const hasContent = content.displayTopic || content.displayContent || content.displayHomework;
+
+  if (!hasContent && !isCanceled) {
+    return (
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 rounded-2xl border border-amber-200 dark:border-amber-800 p-5">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/30">
+            <AlertCircle size={18} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
+              Chưa cập nhật nội dung buổi học
+            </h3>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+              Vui lòng cập nhật nội dung trước khi điểm danh
+            </p>
+            {onEdit && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onEdit}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all"
+              >
+                <Edit2 size={12} />
+                Cập nhật nội dung
+              </motion.button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCanceled) {
+    return (
+      <div className="bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-800 p-5">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-red-100 dark:bg-red-900/30">
+            <XCircle size={18} className="text-red-600 dark:text-red-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
+              Buổi học đã bị hủy
+            </h3>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+              Không thể điểm danh cho buổi học này
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-gray-900/80 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all duration-300"
+    >
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+              <BookOpen size={16} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              Nội dung buổi học
+            </h3>
+          </div>
+          
+          {/* Following Plan Badge */}
+          {content.isFollowingPlan !== undefined && (
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium ${
+              content.isFollowingPlan
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+            }`}>
+              {content.isFollowingPlan ? (
+                <CheckCircle size={10} />
+              ) : (
+                <AlertCircle size={10} />
+              )}
+              <span>{content.isFollowingPlan ? 'Đúng kế hoạch' : 'Lệch kế hoạch'}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Content Body */}
+      <div className="p-5 space-y-4">
+        {/* Topic */}
+        {content.displayTopic && (
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <ClipboardList size={12} />
+              CHỦ ĐỀ
+            </label>
+            <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">
+              {content.displayTopic}
+            </p>
+          </div>
+        )}
+
+        {/* Content */}
+        {content.displayContent && (
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <FileText size={12} />
+              NỘI DUNG
+            </label>
+            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto">
+              {content.displayContent}
+            </div>
+          </div>
+        )}
+
+        {/* Homework */}
+        {content.displayHomework && (
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <ClipboardList size={12} />
+              BÀI TẬP VỀ NHÀ
+            </label>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {content.displayHomework}
+            </p>
+          </div>
+        )}
+
+        {/* Deviation Reason */}
+        {content.deviationReason && (
+          <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border-l-2 border-amber-400">
+            <label className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+              LÝ DO THAY ĐỔI
+            </label>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              {content.deviationReason}
+            </p>
+          </div>
+        )}
+
+        {/* Note for Next Session */}
+        {content.noteForNextSession && (
+          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border-l-2 border-blue-400">
+            <label className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+              GHI CHÚ CHO BUỔI SAU
+            </label>
+            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+              {content.noteForNextSession}
+            </p>
+          </div>
+        )}
+
+        {/* Planned Topic (when not following plan) */}
+        {!content.isFollowingPlan && content.plannedTopic && (
+          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+            <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              KẾ HOẠCH THAM KHẢO
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 line-through mt-1">
+              {content.plannedTopic}
+            </p>
+          </div>
+        )}
+
+        {/* Edit Button */}
+        {onEdit && (
+          <div className="pt-2">
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onEdit}
+              className="w-full py-2 text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+            >
+              <Edit2 size={12} />
+              Chỉnh sửa nội dung
+            </motion.button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// ============================================================================
+// EXISTING COMPONENTS (MonthSelector, SessionCard, StatsCard, TeacherCard, StatusToggle, StudentCard, LoadingSkeleton, EmptyState)
 // ============================================================================
 
 // ----- Month Selector Component -----
@@ -179,14 +431,12 @@ const SessionCard: React.FC<{
   selectedMonth: number;
   onMonthChange: (month: number) => void;
   loadingSchedule?: boolean;
-  selectedSessionId?: string;
+  selectedSessionId?: number;
   onSessionClick?: (session: Session) => void;
 }> = ({ sessions, selectedMonth, onMonthChange, loadingSchedule, selectedSessionId, onSessionClick }) => {
-  // Giữ nguyên cách đếm như cũ
   const completedCount = sessions.filter(s => s.isCurrent || s.isCompleted).length;
   const totalSessions = sessions.length;
 
-  // Hàm lấy màu cho dot dựa trên isCurrent/isCompleted (giữ nguyên logic cũ)
   const getDotColor = (session: Session) => {
     if (session.isCurrent) {
       return "border-indigo-500 bg-white dark:bg-gray-900 shadow-lg shadow-indigo-500/40";
@@ -197,7 +447,6 @@ const SessionCard: React.FC<{
     return "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900";
   };
 
-  // Hàm lấy icon cho dot (giữ nguyên logic cũ)
   const getDotIcon = (session: Session) => {
     if (session.isCurrent) {
       return <CheckCircle size={12} className="text-indigo-500" />;
@@ -208,43 +457,12 @@ const SessionCard: React.FC<{
     return null;
   };
 
-  // Hàm lấy style cho status badge dựa trên API status
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300";
-      case "scheduled":
-        return "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300";
-      case "expired":
-        return "bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-300";
-      case "ongoing":
-        return "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-300 animate-pulse";
-      case "canceled":
-        return "bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400";
-      default:
-        return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
-    }
-  };
-
-  // Hàm lấy text cho status badge dựa trên API status
-  const getStatusBadgeText = (status: string) => {
-    switch (status) {
-      case "completed": return "Hoàn thành";
-      case "scheduled": return "Sắp tới";
-      case "expired": return "Chưa xử lý";
-      case "ongoing": return "Đang diễn ra";
-      case "canceled": return "Đã hủy";
-      default: return "";
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-gray-950/50 border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-2xl transition-shadow duration-300"
     >
-      {/* Header - Giữ nguyên */}
       <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-900/50">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50">
@@ -262,7 +480,6 @@ const SessionCard: React.FC<{
         </div>
       </div>
 
-      {/* Sessions List */}
       <div className="p-5 max-h-[500px] overflow-y-auto custom-scrollbar">
         {loadingSchedule ? (
           <div className="space-y-4">
@@ -284,7 +501,6 @@ const SessionCard: React.FC<{
           </div>
         ) : (
           <div className="relative">
-            {/* Vertical line */}
             <div className="absolute left-[13px] top-2 bottom-2 w-[2px] bg-gradient-to-b from-indigo-200 via-purple-200 to-gray-100 dark:from-indigo-800 dark:via-purple-800 dark:to-gray-800 rounded-full" />
 
             <div className="space-y-4">
@@ -301,7 +517,6 @@ const SessionCard: React.FC<{
                     selectedSessionId === session.id && "ring-2 ring-indigo-500 ring-offset-2"
                   )}
                 >
-                  {/* Stepper dot - Giữ nguyên logic cũ */}
                   <div className={clsx(
                     "absolute left-[6px] top-3 w-[18px] h-[18px] rounded-full border-[3px] flex items-center justify-center transition-all duration-300 z-10",
                     getDotColor(session),
@@ -326,7 +541,6 @@ const SessionCard: React.FC<{
                         {session.title}
                       </span>
 
-                      {/* BADGE TỪ API STATUS - Ưu tiên hiển thị theo status */}
                       {session.status === "completed" && (
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300">
                           Hoàn thành
@@ -372,7 +586,6 @@ const SessionCard: React.FC<{
         )}
       </div>
 
-      {/* Footer - Giữ nguyên legends cũ */}
       <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-900/50">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-4">
@@ -389,15 +602,6 @@ const SessionCard: React.FC<{
               <span className="text-xs text-gray-500">Sắp tới</span>
             </div>
           </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-all"
-          >
-            <Plus size={12} />
-            <span>Xem chi tiết</span>
-          </motion.button>
         </div>
       </div>
     </motion.div>
@@ -439,7 +643,6 @@ const StatsCard: React.FC<{ students: Student[] }> = ({ students }) => {
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="mb-5">
           <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <motion.div
@@ -457,7 +660,6 @@ const StatsCard: React.FC<{ students: Student[] }> = ({ students }) => {
           </div>
         </div>
 
-        {/* Stats list */}
         <div className="space-y-2">
           {[
             { status: "present", count: animatedPresent, icon: UserCheck, color: "emerald", label: "Có mặt" },
@@ -498,7 +700,7 @@ interface TeacherCardProps {
   onStatusChange: (status: StatusType) => void;
   onNoteChange: (note: string | null) => void;
   isReadOnly?: boolean;
-  isCanceled?: boolean; // Thêm prop này
+  isCanceled?: boolean;
 }
 
 const TeacherCard: React.FC<TeacherCardProps> = ({
@@ -509,7 +711,7 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
   onStatusChange,
   onNoteChange,
   isReadOnly = false,
-  isCanceled = false // Mặc định là false
+  isCanceled = false
 }) => {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(teacherNote || "");
@@ -520,7 +722,6 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
   const teacherPrefix = gender === true ? "Thầy" : gender === false ? "Cô" : "GV";
   const startTime = session?.time?.split(" - ")[0] || "--:--";
 
-  // Update note value when teacherNote changes from parent
   useEffect(() => {
     setNoteValue(teacherNote || "");
   }, [teacherNote]);
@@ -545,7 +746,6 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
     { key: "absent" as const, label: "Vắng", icon: XCircle, color: "red" },
   ];
 
-  // Nếu buổi học bị hủy, hiển thị thông báo
   if (isCanceled) {
     return (
       <motion.div
@@ -555,7 +755,7 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
         className="relative overflow-hidden rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-xl shadow-gray-200/50 dark:shadow-gray-950/50 border border-gray-100 dark:border-gray-800"
       >
         <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-red-100/40 to-orange-100/40 dark:from-red-900/20 dark:to-orange-900/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        
+
         <div className="relative p-5">
           <div className="flex flex-col items-center justify-center gap-3 text-center py-8">
             <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -582,23 +782,18 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
       transition={{ delay: 0.15 }}
       className="relative overflow-hidden rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-xl shadow-gray-200/50 dark:shadow-gray-950/50 border border-gray-100 dark:border-gray-800 hover:shadow-2xl transition-shadow duration-300"
     >
-      {/* Decorative gradient backgrounds */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-indigo-100/40 to-violet-100/40 dark:from-indigo-900/20 dark:to-violet-900/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-gradient-to-tr from-emerald-100/20 to-teal-100/20 dark:from-emerald-900/10 dark:to-teal-900/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
       <div className="relative p-5">
-        {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Left - Teacher Info */}
           <div className="flex items-center gap-4">
-            {/* Avatar */}
             <div className="relative">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 p-0.5 shadow-lg shadow-indigo-500/20">
                 <div className="w-full h-full rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center">
                   <GraduationCap size={30} className="text-indigo-600 dark:text-indigo-400" />
                 </div>
               </div>
-              {/* Status dot */}
               <div className={clsx(
                 "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ring-2 ring-white dark:ring-gray-900 transition-all duration-300",
                 teacherStatus === "present" ? "bg-emerald-500 shadow-lg shadow-emerald-500/30" :
@@ -607,7 +802,6 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
               )} />
             </div>
 
-            {/* Teacher details */}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-gray-800 dark:text-gray-200 text-base">
@@ -633,10 +827,8 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
             </div>
           </div>
 
-          {/* Right - Controls (only show when not read-only) */}
           {!isReadOnly && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              {/* Status Buttons Group */}
               <div className="flex items-center gap-1 bg-gray-100/80 dark:bg-gray-800/80 p-1 rounded-xl backdrop-blur-sm">
                 {statusButtons.map((btn) => {
                   const Icon = btn.icon;
@@ -663,7 +855,6 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
                 })}
               </div>
 
-              {/* Note Input Section */}
               <div className="relative min-w-[200px]">
                 {isEditingNote ? (
                   <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
@@ -702,6 +893,7 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
     </motion.div>
   );
 };
+
 // ----- Status Toggle Component -----
 const StatusToggle: React.FC<{
   status: StatusType;
@@ -743,7 +935,6 @@ const StatusToggle: React.FC<{
 };
 
 // ----- Student Card -----
-// Student Card - VERSION ĐƠN GIẢN (chỉ có 1 case)
 const StudentCard: React.FC<{
   student: Student;
   onStatusChange: (id: string, status: StatusType) => void;
@@ -774,7 +965,6 @@ const StudentCard: React.FC<{
     }
   };
 
-  // CHỈ CÒN 1 CASE: Học sinh bình thường
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -784,7 +974,6 @@ const StudentCard: React.FC<{
       className="group bg-white dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all duration-200"
     >
       <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Student Info */}
         <div className="flex items-center gap-3 min-w-[180px]">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative">
             <img
@@ -810,7 +999,6 @@ const StudentCard: React.FC<{
           </div>
         </div>
 
-        {/* Status Toggle */}
         <div className="flex-1 flex justify-center sm:justify-start">
           <div className={isUpdatingStatus ? "opacity-50 pointer-events-none" : ""}>
             <StatusToggle
@@ -820,7 +1008,6 @@ const StudentCard: React.FC<{
           </div>
         </div>
 
-        {/* Note with inline edit */}
         <div className="flex-1 min-w-[140px]">
           {isEditingNote ? (
             <div className="flex items-center gap-2">
@@ -858,7 +1045,6 @@ const StudentCard: React.FC<{
           )}
         </div>
 
-        {/* More actions */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -870,6 +1056,7 @@ const StudentCard: React.FC<{
     </motion.div>
   );
 };
+
 // ----- Loading Skeleton -----
 const LoadingSkeleton: React.FC = () => (
   <div className="space-y-3">
@@ -929,6 +1116,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
     </motion.div>
   );
 };
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -958,17 +1146,28 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
   const [updatingType, setUpdatingType] = useState<"status" | "note" | null>(null);
   const isCurrentSessionCanceled = selectedSession?.status === "canceled";
 
-  // Get setAlert from context
+  const [showContentModal, setShowContentModal] = useState(false);
+  const [hasUpdatedContent, setHasUpdatedContent] = useState(false);
+
   const { setAlert } = useOutletContext<any>();
 
-  // Check if there are any changes
   const checkForChanges = () => {
     const studentChanges = JSON.stringify(studentList) !== JSON.stringify(originalStudentList);
     const teacherChanges = teacherStatus !== originalTeacherStatus || teacherNote !== originalTeacherNote;
     setHasChanges(studentChanges || teacherChanges);
   };
 
-  // Fetch schedule
+  const checkSessionContentStatus = async (sessionId: number) => {
+    try {
+      const content = await sessionApi.getSessionContent(sessionId);
+      setHasUpdatedContent(!!content.displayTopic);
+      return !!content.displayTopic;
+    } catch (error) {
+      console.error('Error checking session content:', error);
+      return false;
+    }
+  };
+
   const fetchSchedule = async (subjectId: number) => {
     try {
       setLoadingSchedule(true);
@@ -982,22 +1181,19 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
           const start = new Date(`${item.sessionDate}T${item.startTime}`);
           const end = new Date(`${item.sessionDate}T${item.endTime}`);
 
-          // Giữ nguyên logic cũ để xác định isCurrent, isCompleted
           const isCurrentSession = today >= start && today <= end;
           const isCompletedSession = today > end;
-
-          // Lấy status từ API
           const apiStatus = item.status || "scheduled";
 
           return {
-            id: item.id.toString(),
+            id: item.id,
             title: `Buổi ${index + 1}: ${item.Room?.name || "Phòng học"}`,
             date: today.toDateString() === start.toDateString() ? "Hôm nay" : start.toLocaleDateString("vi-VN"),
             time: `${item.startTime.slice(0, 5)} - ${item.endTime.slice(0, 5)}`,
             sessionDate: item.sessionDate,
             isCurrent: isCurrentSession,
             isCompleted: isCompletedSession,
-            status: apiStatus // Status từ API
+            status: apiStatus
           };
         });
 
@@ -1016,55 +1212,43 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
     }
   };
 
-  // Fetch attendance data - CHỈ LẤY HỌC SINH THỰC SỰ THAM GIA
-  const fetchAttendanceData = async (subjectId: number, sessionId: string) => {
+  const fetchAttendanceData = async (subjectId: number, sessionId: number) => {
     try {
       setIsLoading(true);
 
-      // Gọi API lấy dữ liệu điểm danh
       const response = await attendanceApi.getBySubject(subjectId);
       const data: AttendanceResponse = response.data;
-      const sessionIdNum = parseInt(sessionId);
 
-      // Xử lý từng học sinh - CHỈ LẤY HỌC SINH CÓ THỂ ĐIỂM DANH
       const mappedStudents: Student[] = [];
 
       for (const student of data.students) {
-        // Tìm attendance record cho session hiện tại
         const attendance = student.attendances.find(
-          (att: AttendanceItem) => att.sessionId === sessionIdNum
+          (att: AttendanceItem) => att.sessionId === sessionId
         );
 
-        // ============================================================
-        // QUAN TRỌNG: Bỏ qua các học sinh KHÔNG thể điểm danh
-        // ============================================================
-
-        // Không có attendance record -> vẫn có thể điểm danh (chưa điểm danh lần nào)
         if (!attendance) {
           mappedStudents.push({
             id: student.studentId.toString(),
             name: student.fullName,
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(student.fullName)}&background=6366f1&color=fff`,
-            status: "absent", // Mặc định chưa điểm danh
+            status: "absent",
             note: null,
           });
           continue;
         }
 
-        // Bỏ qua các status KHÔNG thể điểm danh
         const invalidStatuses = [
-          "not_enrolled",      // Chưa đăng ký trong toàn bộ khóa học
-          "removed",           // Đã bị xóa khỏi lớp
-          "not_enrolled_yet",  // Chưa đăng ký tại thời điểm session này
-          "completed"          // Đã hoàn thành khóa học trước session này
+          "not_enrolled",
+          "removed",
+          "not_enrolled_yet",
+          "completed"
         ];
 
         if (invalidStatuses.includes(attendance.status)) {
           console.log(`⏭️ Skipped student: ${student.fullName} - Status: ${attendance.status}`);
-          continue; // Không thêm vào danh sách
+          continue;
         }
 
-        // Các status hợp lệ: present, late, absent, pending
         let uiStatus: StatusType = "absent";
         switch (attendance.status) {
           case "present":
@@ -1115,7 +1299,6 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
     }
   };
 
-  // Fetch teacher attendance data
   const fetchTeacherAttendanceData = async () => {
     if (!subject?.id || !selectedSession?.id) return;
 
@@ -1127,7 +1310,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
       const foundTeacher = data.teachers.find(t => t.teacherId === teacherId);
 
       if (foundTeacher) {
-        const sessionIdNum = parseInt(selectedSession.id);
+        const sessionIdNum = selectedSession.id;
         const currentAttendance = foundTeacher.attendances.find(
           (att: TeacherAttendanceItem) => att.sessionId === sessionIdNum
         );
@@ -1159,170 +1342,158 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
   };
 
   const refreshSessionStatus = async () => {
-  if (!subject?.id) return;
-  
-  try {
-    // Gọi lại API để lấy dữ liệu mới
-    const res = await sessionApi.getScheduleBySubject(subject.id);
-    
-    const updatedSessions = res.sessions
-      .filter((item: SessionOfSubject) => new Date(item.sessionDate).getMonth() + 1 === selectedMonth)
-      .sort((a: SessionOfSubject, b: SessionOfSubject) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime())
-      .map((item: SessionOfSubject, index: number) => {
-        const today = new Date();
-        const start = new Date(`${item.sessionDate}T${item.startTime}`);
-        const end = new Date(`${item.sessionDate}T${item.endTime}`);
-        
-        const isCurrentSession = today >= start && today <= end;
-        const isCompletedSession = today > end;
-        const apiStatus = item.status || "scheduled";
-        
-        return {
-          id: item.id.toString(),
-          title: `Buổi ${index + 1}: ${item.Room?.name || "Phòng học"}`,
-          date: today.toDateString() === start.toDateString() ? "Hôm nay" : start.toLocaleDateString("vi-VN"),
-          time: `${item.startTime.slice(0, 5)} - ${item.endTime.slice(0, 5)}`,
-          sessionDate: item.sessionDate,
-          isCurrent: isCurrentSession,
-          isCompleted: isCompletedSession,
-          status: apiStatus
-        };
+    if (!subject?.id) return;
+
+    try {
+      const res = await sessionApi.getScheduleBySubject(subject.id);
+
+      const updatedSessions = res.sessions
+        .filter((item: SessionOfSubject) => new Date(item.sessionDate).getMonth() + 1 === selectedMonth)
+        .sort((a: SessionOfSubject, b: SessionOfSubject) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime())
+        .map((item: SessionOfSubject, index: number) => {
+          const today = new Date();
+          const start = new Date(`${item.sessionDate}T${item.startTime}`);
+          const end = new Date(`${item.sessionDate}T${item.endTime}`);
+
+          const isCurrentSession = today >= start && today <= end;
+          const isCompletedSession = today > end;
+          const apiStatus = item.status || "scheduled";
+
+          return {
+            id: item.id,
+            title: `Buổi ${index + 1}: ${item.Room?.name || "Phòng học"}`,
+            date: today.toDateString() === start.toDateString() ? "Hôm nay" : start.toLocaleDateString("vi-VN"),
+            time: `${item.startTime.slice(0, 5)} - ${item.endTime.slice(0, 5)}`,
+            sessionDate: item.sessionDate,
+            isCurrent: isCurrentSession,
+            isCompleted: isCompletedSession,
+            status: apiStatus
+          };
+        });
+
+      setSessions(updatedSessions);
+
+      if (selectedSession) {
+        const updatedSelectedSession = updatedSessions.find(s => s.id === selectedSession.id);
+        if (updatedSelectedSession) {
+          setSelectedSession(updatedSelectedSession);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi refresh session status:", error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!subject?.id || !selectedSession) return;
+    setIsSaving(true);
+
+    try {
+      const promises = [];
+      const changesList: string[] = [];
+
+      const studentChanges = studentList.filter((student, index) => {
+        const original = originalStudentList[index];
+        return original && (student.status !== original.status || student.note !== original.note);
       });
-    
-    setSessions(updatedSessions);
-    
-    // Cập nhật lại selected session nếu cần
-    if (selectedSession) {
-      const updatedSelectedSession = updatedSessions.find(s => s.id === selectedSession.id);
-      if (updatedSelectedSession) {
-        setSelectedSession(updatedSelectedSession);
+
+      let studentStatusChanges = 0;
+      let studentNoteChanges = 0;
+
+      for (const student of studentChanges) {
+        const original = originalStudentList.find(s => s.id === student.id);
+        if (original && (student.status !== original.status)) {
+          promises.push(
+            attendanceApi.updateStatus({
+              sessionId: selectedSession.id,
+              studentId: parseInt(student.id),
+              status: student.status,
+            })
+          );
+          studentStatusChanges++;
+        }
+        if (original && (student.note !== original.note)) {
+          promises.push(
+            attendanceApi.updateNote({
+              sessionId: selectedSession.id,
+              studentId: parseInt(student.id),
+              note: student.note || null,
+            })
+          );
+          studentNoteChanges++;
+        }
       }
-    }
-  } catch (error) {
-    console.error("Lỗi refresh session status:", error);
-  }
-};
 
-  // Save all changes when clicking save button
-  // Save all changes when clicking save button
-const handleSave = async () => {
-  if (!subject?.id || !selectedSession) return;
-  setIsSaving(true);
-
-  try {
-    const promises = [];
-    const changesList: string[] = [];
-
-    // Save student changes
-    const studentChanges = studentList.filter((student, index) => {
-      const original = originalStudentList[index];
-      return original && (student.status !== original.status || student.note !== original.note);
-    });
-
-    let studentStatusChanges = 0;
-    let studentNoteChanges = 0;
-
-    for (const student of studentChanges) {
-      const original = originalStudentList.find(s => s.id === student.id);
-      if (original && (student.status !== original.status)) {
-        promises.push(
-          attendanceApi.updateStatus({
-            sessionId: parseInt(selectedSession.id),
-            studentId: parseInt(student.id),
-            status: student.status,
-          })
-        );
-        studentStatusChanges++;
+      if (studentStatusChanges > 0) {
+        changesList.push(`${studentStatusChanges} học sinh cập nhật trạng thái`);
       }
-      if (original && (student.note !== original.note)) {
-        promises.push(
-          attendanceApi.updateNote({
-            sessionId: parseInt(selectedSession.id),
-            studentId: parseInt(student.id),
-            note: student.note || null,
-          })
-        );
-        studentNoteChanges++;
+      if (studentNoteChanges > 0) {
+        changesList.push(`${studentNoteChanges} học sinh cập nhật ghi chú`);
       }
-    }
 
-    if (studentStatusChanges > 0) {
-      changesList.push(`${studentStatusChanges} học sinh cập nhật trạng thái`);
-    }
-    if (studentNoteChanges > 0) {
-      changesList.push(`${studentNoteChanges} học sinh cập nhật ghi chú`);
-    }
-
-    // Save teacher changes
-    if (teacherStatus !== originalTeacherStatus) {
-      const teacher = subject?.teacherSubjects?.[0]?.teacher;
-      if (teacher?.id) {
-        promises.push(
-          teacherAttendanceApi.updateStatus({
-            sessionId: parseInt(selectedSession.id),
-            teacherId: teacher.id,
-            status: teacherStatus,
-          })
-        );
-        changesList.push(`Cập nhật trạng thái giáo viên: ${teacherStatus === "present" ? "Có mặt" : teacherStatus === "late" ? "Muộn" : "Vắng mặt"}`);
+      if (teacherStatus !== originalTeacherStatus) {
+        const teacher = subject?.teacherSubjects?.[0]?.teacher;
+        if (teacher?.id) {
+          promises.push(
+            teacherAttendanceApi.updateStatus({
+              sessionId: selectedSession.id,
+              teacherId: teacher.id,
+              status: teacherStatus,
+            })
+          );
+          changesList.push(`Cập nhật trạng thái giáo viên: ${teacherStatus === "present" ? "Có mặt" : teacherStatus === "late" ? "Muộn" : "Vắng mặt"}`);
+        }
       }
-    }
 
-    if (teacherNote !== originalTeacherNote) {
-      const teacher = subject?.teacherSubjects?.[0]?.teacher;
-      if (teacher?.id) {
-        promises.push(
-          teacherAttendanceApi.updateNote({
-            sessionId: parseInt(selectedSession.id),
-            teacherId: teacher.id,
-            note: teacherNote || null,
-          })
-        );
-        changesList.push(`Cập nhật ghi chú giáo viên`);
+      if (teacherNote !== originalTeacherNote) {
+        const teacher = subject?.teacherSubjects?.[0]?.teacher;
+        if (teacher?.id) {
+          promises.push(
+            teacherAttendanceApi.updateNote({
+              sessionId: selectedSession.id,
+              teacherId: teacher.id,
+              note: teacherNote || null,
+            })
+          );
+          changesList.push(`Cập nhật ghi chú giáo viên`);
+        }
       }
-    }
 
-    // Execute all API calls
-    await Promise.all(promises);
+      await Promise.all(promises);
+      await refreshSessionStatus();
 
-    // ✅ QUAN TRỌNG: Refresh session status sau khi lưu thành công
-    await refreshSessionStatus();
+      setOriginalStudentList(JSON.parse(JSON.stringify(studentList)));
+      setOriginalTeacherStatus(teacherStatus);
+      setOriginalTeacherNote(teacherNote);
+      setHasChanges(false);
 
-    // Update original data after successful save
-    setOriginalStudentList(JSON.parse(JSON.stringify(studentList)));
-    setOriginalTeacherStatus(teacherStatus);
-    setOriginalTeacherNote(teacherNote);
-    setHasChanges(false);
+      if (changesList.length > 0) {
+        setAlert?.({
+          type: "success",
+          message: `Lưu điểm danh thành công!\n${changesList.join(", ")}`,
+        });
+      } else {
+        setAlert?.({
+          type: "info",
+          message: "Không có thay đổi nào để lưu.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Lỗi lưu điểm danh:", error);
 
-    // Show success alert
-    if (changesList.length > 0) {
       setAlert?.({
-        type: "success",
-        message: `Lưu điểm danh thành công!\n${changesList.join(", ")}`,
+        type: "error",
+        message: error?.response?.data?.message || "Có lỗi xảy ra khi lưu điểm danh. Vui lòng thử lại!",
       });
-    } else {
-      setAlert?.({
-        type: "info",
-        message: "Không có thay đổi nào để lưu.",
-      });
+
+      setStudentList(JSON.parse(JSON.stringify(originalStudentList)));
+      setTeacherStatus(originalTeacherStatus);
+      setTeacherNote(originalTeacherNote);
+    } finally {
+      setIsSaving(false);
     }
-  } catch (error: any) {
-    console.error("Lỗi lưu điểm danh:", error);
+  };
 
-    setAlert?.({
-      type: "error",
-      message: error?.response?.data?.message || "Có lỗi xảy ra khi lưu điểm danh. Vui lòng thử lại!",
-    });
-
-    setStudentList(JSON.parse(JSON.stringify(originalStudentList)));
-    setTeacherStatus(originalTeacherStatus);
-    setTeacherNote(originalTeacherNote);
-  } finally {
-    setIsSaving(false);
-  }
-};
-
-  // Handle revert changes
   const handleRevert = () => {
     setAlert?.({
       type: "warning",
@@ -1347,7 +1518,6 @@ const handleSave = async () => {
     });
   };
 
-  // Local update functions
   const updateStatus = (id: string, status: StatusType) => {
     setStudentList(prev => prev.map(s => s.id === id ? { ...s, status } : s));
   };
@@ -1364,24 +1534,32 @@ const handleSave = async () => {
     setTeacherNote(note);
   };
 
-  // Check for changes whenever data updates
   useEffect(() => {
     checkForChanges();
   }, [studentList, teacherStatus, teacherNote]);
 
-  // Effects
   useEffect(() => {
     if (subject?.id) fetchSchedule(subject.id);
   }, [subject?.id, selectedMonth]);
 
   useEffect(() => {
     if (subject?.id && selectedSession) {
-      fetchAttendanceData(subject.id, selectedSession.id);
-      fetchTeacherAttendanceData();
+      const loadData = async () => {
+        const hasContent = await checkSessionContentStatus(selectedSession.id);
+
+        if (!hasContent && selectedSession.status !== 'canceled') {
+          setShowContentModal(true);
+          return;
+        }
+
+        fetchAttendanceData(subject.id, selectedSession.id);
+        fetchTeacherAttendanceData();
+      };
+
+      loadData();
     }
   }, [subject?.id, selectedSession]);
 
-  // Dark mode
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
@@ -1393,6 +1571,25 @@ const handleSave = async () => {
     const matchesFilter = statusFilter === "all" || student.status === statusFilter;
     return matchesSearch && matchesFilter;
   });
+
+  const handleContentSaved = () => {
+    setHasUpdatedContent(true);
+    setShowContentModal(false);
+
+    if (subject?.id && selectedSession) {
+      fetchAttendanceData(subject.id, selectedSession.id);
+      fetchTeacherAttendanceData();
+    }
+
+    setAlert?.({
+      type: "success",
+      message: "Đã cập nhật nội dung buổi học. Bạn có thể bắt đầu điểm danh.",
+    });
+  };
+
+  const handleOpenContentModal = () => {
+    setShowContentModal(true);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 transition-colors duration-300">
@@ -1407,10 +1604,8 @@ const handleSave = async () => {
               <p className="text-xs text-gray-400 mt-0.5">{selectedSession?.title || subject?.name}</p>
             </div>
 
-            {/* Chỉ hiển thị các nút điều khiển khi buổi học không bị hủy */}
             {!isCurrentSessionCanceled && (
               <div className="flex items-center gap-3">
-                {/* Search */}
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -1422,7 +1617,6 @@ const handleSave = async () => {
                   />
                 </div>
 
-                {/* Filter Dropdown */}
                 <div className="relative">
                   <select
                     value={statusFilter}
@@ -1437,7 +1631,6 @@ const handleSave = async () => {
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
 
-                {/* Revert Button - Hiển thị khi có thay đổi */}
                 {hasChanges && (
                   <motion.button
                     initial={{ scale: 0.9, opacity: 0 }}
@@ -1452,7 +1645,6 @@ const handleSave = async () => {
                   </motion.button>
                 )}
 
-                {/* Save Button */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -1482,7 +1674,7 @@ const handleSave = async () => {
       {/* Main Content */}
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT PANEL - Sessions + Stats */}
+          {/* LEFT PANEL - Sessions + Content + Stats */}
           <div className="lg:col-span-4 space-y-5">
             <SessionCard
               sessions={sessions}
@@ -1492,11 +1684,19 @@ const handleSave = async () => {
               selectedSessionId={selectedSession?.id}
               onSessionClick={setSelectedSession}
             />
-            {/* Chỉ hiển thị StatsCard khi buổi học không bị hủy */}
+            
+            {/* Session Content Card - Hiển thị ngay dưới lịch trình */}
+            {selectedSession && (
+              <SessionContentCard
+                sessionId={selectedSession.id}
+                onEdit={handleOpenContentModal}
+                isCanceled={isCurrentSessionCanceled}
+              />
+            )}
+            
             {!isCurrentSessionCanceled && <StatsCard students={studentList} />}
           </div>
 
-          {/* RIGHT PANEL - Teacher + Student List */}
           {/* RIGHT PANEL - Teacher + Student List */}
           <div className="lg:col-span-8 space-y-5">
             <TeacherCard
@@ -1510,10 +1710,8 @@ const handleSave = async () => {
               isCanceled={isCurrentSessionCanceled}
             />
 
-            {/* Chỉ hiển thị danh sách học sinh khi buổi học không bị hủy */}
             {!isCurrentSessionCanceled ? (
               <>
-                {/* Student List Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -1544,7 +1742,6 @@ const handleSave = async () => {
                   </div>
                 </div>
 
-                {/* Student List */}
                 <AnimatePresence mode="wait">
                   {isLoading ? (
                     <LoadingSkeleton />
@@ -1574,7 +1771,22 @@ const handleSave = async () => {
           </div>
         </div>
       </div>
+
+      {/* Session Content Modal */}
+      <SessionContentModal
+        isOpen={showContentModal}
+        onClose={() => {
+          if (!hasUpdatedContent) {
+            setSelectedSession(null);
+          }
+          setShowContentModal(false);
+        }}
+        session={selectedSession}
+        subject={subject}
+        onSaveSuccess={handleContentSaved}
+      />
     </div>
   );
 };
+
 export default AttendanceSection;

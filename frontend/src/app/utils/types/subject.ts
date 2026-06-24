@@ -24,6 +24,22 @@ export interface SubjectResponse {
   page: number
 }
 
+export const BillingType = {
+  PER_HOUR: 'PER_HOUR',
+  PER_SUBJECT: 'PER_SUBJECT'
+} as const
+
+export type BillingType =
+  (typeof BillingType)[keyof typeof BillingType]
+
+export const PaymentPlanType = {
+  FULL: 'FULL',
+  INSTALLMENT: 'INSTALLMENT'
+} as const
+
+export type PaymentPlanType =
+  (typeof PaymentPlanType)[keyof typeof PaymentPlanType]
+
 export interface Subject {
   id: number
   name: string
@@ -35,6 +51,11 @@ export interface Subject {
   image: string | null
   note: string
   currentStudents: number
+
+  // === THÊM 3 FIELD BILLING ===
+  billingType: BillingType | null
+  paymentPlanType: PaymentPlanType | null
+  installmentCount: number | null
 
   subjectType: {
     id: number
@@ -67,6 +88,7 @@ export interface SubjectName {
   name: string
 }
 
+// === CẬP NHẬT CREATE SUBJECT REQUEST ===
 export interface CreateSubjectRequest {
   name: string
   grade: string
@@ -79,8 +101,14 @@ export interface CreateSubjectRequest {
   image?: File | null
   imageUrl?: string
   subjectTypeId?: number
+  
+  // === THÊM 3 FIELD BILLING ===
+  billingType?: BillingType
+  paymentPlanType?: PaymentPlanType
+  installmentCount?: number
 }
 
+// === CẬP NHẬT UPDATE SUBJECT REQUEST ===
 export interface UpdateSubjectRequest {
   name?: string
   grade?: string
@@ -92,6 +120,12 @@ export interface UpdateSubjectRequest {
   teacherId?: number
   subjectTypeId?: number
   imageUrl?: string
+  salaryRate?: number // Thêm field này nếu backend cần
+  
+  // === THÊM 3 FIELD BILLING ===
+  billingType?: BillingType
+  paymentPlanType?: PaymentPlanType
+  installmentCount?: number
 }
 
 export interface TeacherSubjectResponse {

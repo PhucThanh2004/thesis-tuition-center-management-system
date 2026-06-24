@@ -1,66 +1,280 @@
-// src/app/components/teachers/RecentActivities.tsx
-import React from 'react';
-import { Edit, UserPlus, CalendarX, User } from 'lucide-react';
-import type { TeacherActivity } from '../../../utils/types/teacher';
+// src/app/components/teachers/RecentTeacherActivities.tsx
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Edit, History, ArrowRight, Clock, Trash2, CheckCircle, XCircle, LogIn, LogOut, Users, Award, Calendar, Briefcase } from 'lucide-react';
+import type { ActivityLog } from '../../../utils/types/activity-log';
+import { activityLogApi } from '../../../utils/api/activity-log.api';
 
-interface RecentActivitiesProps {
-  activities: TeacherActivity[];
+interface RecentTeacherActivitiesProps {
+  limit?: number;
+  onViewAll?: () => void;
 }
 
-const RecentActivities: React.FC<RecentActivitiesProps> = ({ activities }) => {
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'profile':
-        return <Edit className="w-4 h-4 text-blue-600" />;
-      case 'teacher':
-        return <UserPlus className="w-4 h-4 text-purple-600" />;
-      case 'leave':
-        return <CalendarX className="w-4 h-4 text-orange-600" />;
-      default:
-        return <User className="w-4 h-4 text-slate-600" />;
+const RecentActivities: React.FC<RecentTeacherActivitiesProps> = ({
+  limit = 5,
+  onViewAll
+}) => {
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Helper function để parse meta an toàn
+  const getMetaSafe = (metaString: string | null) => {
+    if (!metaString) return null;
+    try {
+      return JSON.parse(metaString);
+    } catch (error) {
+      console.warn('Failed to parse meta JSON:', metaString);
+      return null;
     }
   };
 
-  const getActivityBg = (type: string) => {
-    switch (type) {
-      case 'profile':
-        return 'bg-blue-50';
-      case 'teacher':
-        return 'bg-purple-50';
-      case 'leave':
-        return 'bg-orange-50';
+  // Format thời gian tương đối
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  };
+
+  // Map action type sang icon và màu sắc
+  const getActivityStyle = (actionType: string) => {
+    switch (actionType) {
+      case 'CREATE':
+        return {
+          icon: UserPlus,
+          bg: 'bg-green-100',
+          color: 'text-green-600',
+          hoverBg: 'hover:bg-green-200',
+          label: 'Thêm mới'
+        };
+      case 'UPDATE':
+        return {
+          icon: Edit,
+          bg: 'bg-blue-100',
+          color: 'text-blue-600',
+          hoverBg: 'hover:bg-blue-200',
+          label: 'Cập nhật'
+        };
+      case 'DELETE':
+        return {
+          icon: Trash2,
+          bg: 'bg-red-100',
+          color: 'text-red-600',
+          hoverBg: 'hover:bg-red-200',
+          label: 'Xóa'
+        };
+      case 'APPROVE':
+        return {
+          icon: CheckCircle,
+          bg: 'bg-emerald-100',
+          color: 'text-emerald-600',
+          hoverBg: 'hover:bg-emerald-200',
+          label: 'Phê duyệt'
+        };
+      case 'REJECT':
+        return {
+          icon: XCircle,
+          bg: 'bg-amber-100',
+          color: 'text-amber-600',
+          hoverBg: 'hover:bg-amber-200',
+          label: 'Từ chối'
+        };
+      case 'LOGIN':
+        return {
+          icon: LogIn,
+          bg: 'bg-purple-100',
+          color: 'text-purple-600',
+          hoverBg: 'hover:bg-purple-200',
+          label: 'Đăng nhập'
+        };
+      case 'LOGOUT':
+        return {
+          icon: LogOut,
+          bg: 'bg-gray-100',
+          color: 'text-gray-600',
+          hoverBg: 'hover:bg-gray-200',
+          label: 'Đăng xuất'
+        };
       default:
-        return 'bg-slate-50';
+        return {
+          icon: History,
+          bg: 'bg-gray-100',
+          color: 'text-gray-600',
+          hoverBg: 'hover:bg-gray-200',
+          label: 'Hoạt động'
+        };
     }
   };
+
+  // Lấy tên từ description (ví dụ: "đã cập nhật thông tin giáo viên: Nguyễn Văn A")
+  const extractNameFromDescription = (description: string) => {
+    const match = description.match(/: (.+)$/);
+    return match ? match[1] : null;
+  };
+
+  // Lấy thông tin chi tiết từ meta
+  const getTeacherDetails = (meta: any) => {
+    if (!meta) return null;
+    return {
+      specialty: meta.specialty,
+      teacherId: meta.teacherId,
+      email: meta.email,
+      dateOfBirth: meta.dateOfBirth
+    };
+  };
+
+  // Fetch activities từ API
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        setLoading(true);
+        const data = await activityLogApi.getRecentActivities(20);
+
+        // Lọc chỉ lấy TEACHER_LIST
+        const filteredData = data.filter(
+          activity => activity.targetType === 'TEACHER_LIST'
+        );
+
+        setActivities(filteredData.slice(0, limit));
+      } catch (err) {
+        console.error('Error fetching teacher activities:', err);
+        setActivities([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivities();
+  }, [limit]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+          <div className="space-y-2">
+            <div className="h-10 bg-gray-100 rounded"></div>
+            <div className="h-10 bg-gray-100 rounded"></div>
+            <div className="h-10 bg-gray-100 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <h2 className="text-sm font-bold text-slate-700 mb-4">Hoạt động gần đây</h2>
-      <div className="space-y-4">
-        {activities.map((activity, index) => (
-          <div key={activity.id} className="flex gap-3">
-            <div className={`relative ${index < activities.length - 1 ? 'pb-4' : ''}`}>
-              <div className={`w-8 h-8 rounded-full ${getActivityBg(activity.type)} flex items-center justify-center flex-shrink-0`}>
-                {getActivityIcon(activity.type)}
-              </div>
-              {index < activities.length - 1 && (
-                <div className="absolute top-8 left-4 w-px h-4 bg-slate-200" />
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="text-sm">
-                <span className="font-semibold text-slate-800">{activity.user}</span>
-                <span className="text-slate-600"> {activity.action}</span>
-              </p>
-              <p className="text-xs text-slate-500 mt-0.5">{activity.description}</p>
-              <span className="text-[10px] text-slate-400 font-medium mt-1 inline-block">
-                {activity.time}
-              </span>
-            </div>
+    <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+          <div className="p-1 bg-purple-100 rounded-lg">
+            <Users className="w-3.5 h-3.5 text-purple-600" />
           </div>
-        ))}
+          Hoạt động giáo viên gần đây
+        </h3>
+        {onViewAll && activities.length > 0 && (
+          <button
+            onClick={onViewAll}
+            className="text-purple-600 text-[10px] font-semibold uppercase tracking-wider hover:underline flex items-center gap-1 transition-colors"
+          >
+            Xem tất cả
+            <ArrowRight className="w-2.5 h-2.5" />
+          </button>
+        )}
       </div>
+
+      {activities.length === 0 ? (
+        <div className="text-center py-6">
+          <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+          <p className="text-xs text-gray-500">Chưa có hoạt động nào của giáo viên</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {activities.map((activity, index) => {
+            const IconComponent = getActivityStyle(activity.actionType).icon;
+            const iconStyle = getActivityStyle(activity.actionType);
+            const isLast = index === activities.length - 1;
+            const meta = getMetaSafe(activity.meta);
+
+            return (
+              <div key={activity.id} className="relative flex gap-2.5 group">
+                {!isLast && (
+                  <div className="absolute left-[11px] top-6 bottom-[-14px] w-px bg-gray-200"></div>
+                )}
+
+                {/* Icon - luôn hiển thị icon theo action type */}
+                <div className="relative z-10">
+                  <div className={`w-6 h-6 rounded-full ${iconStyle.bg} flex items-center justify-center transition-colors ${iconStyle.hoverBg}`}>
+                    <IconComponent className={`w-3 h-3 ${iconStyle.color}`} />
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {/* Nội dung description với kích thước chữ nhỏ hơn */}
+                  <div className="text-xs text-gray-700 leading-relaxed">
+                    <span className="font-semibold text-gray-900">{activity.userName}</span>
+                    {' '}
+                    <span>{activity.description}</span>
+                  </div>
+
+                  {/* Thời gian và thông tin bổ sung - kích thước nhỏ hơn */}
+                  <div className="flex items-center flex-wrap gap-1 mt-0.5">
+                    <Clock className="w-2.5 h-2.5 text-gray-400" />
+                    <span className="text-[10px] text-gray-400">
+                      {formatRelativeTime(activity.createdAt)}
+                    </span>
+
+                    {/* Hiển thị status nếu có trong meta */}
+                    {meta?.status && (
+                      <>
+                        <span className="text-[10px] text-gray-300">•</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta.status === 'APPROVED' ? 'bg-green-100 text-green-600' :
+                            meta.status === 'REJECTED' ? 'bg-red-100 text-red-600' :
+                              'bg-gray-100 text-gray-600'
+                          }`}>
+                          {meta.status.toLowerCase()}
+                        </span>
+                      </>
+                    )}
+
+                    {/* Hiển thị số lượng nếu là bulk action */}
+                    {meta?.count && meta.count > 1 && (
+                      <>
+                        <span className="text-[10px] text-gray-300">•</span>
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                          {meta.count} giáo viên
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Quick stats footer */}
+      {activities.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex justify-between text-[10px] text-gray-500">
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {activities.length} hoạt động
+            </span>
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              Cập nhật gần nhất
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

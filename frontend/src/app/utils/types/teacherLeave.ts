@@ -87,6 +87,7 @@ export interface TeacherLeave {
   affectType?: 'CANCEL' | 'REPLACE';
   processed?: boolean;
   affectedSessions?: PreviewAffectedSessionResponse[];
+  teacherAvatar?: string;
 }
 
 export interface TeacherLeaveRequest {
@@ -107,7 +108,8 @@ export interface TeacherLeaveApproveRequest {
   action: 'APPROVED' | 'REJECTED';
   affectType?: 'CANCEL' | 'REPLACE';
   comment?: string;
-  replacements?: ReplacementSelection[];
+  replacements?: ReplacementWithSalary[];
+  cancelledSessions?: number[];
 }
 
 export interface TeacherLeaveFilter {
@@ -179,6 +181,7 @@ export interface AffectedSession {
   originalTeacherName?: string;  // Thêm field này
   replacementTeacherId?: number;
   replacementTeacherName?: string;
+  replacementSalary?: number;
   assignedAt?: string;
   respondedAt?: string;
   declineReason?: string;
@@ -221,13 +224,14 @@ export interface AvailableReplacementTeacher {
   teacherId: number;
   teacherName: string;
   teacherEmail: string;
+  defaultSalary?: number;
 }
 export interface PreviewReplacementPlanRequest {
   startDate: string;
   endDate: string;
   startTime?: string;
   endTime?: string;
-  replacements?: ReplacementSelection[];
+  replacements?: ReplacementWithSalary[];
 }
 
 //Thêm cho giao diện của giáo viên khi xem chi tiết đơn nghỉ phép của mình
@@ -276,4 +280,15 @@ export interface ReplacementSession {
   // Thêm các field optional để tương thích
   room?: string;
   date?: string;
+}
+export interface ReplacementWithSalary {
+  sessionId: number;
+  replacementTeacherId: number;
+  salary?: number;  // Tiền lương cho buổi thay thế
+}
+
+export interface AssignReplacementTeacherRequest {
+  replacementTeacherId: number;
+  adminNote?: string;
+  replacementSalary?: number;  // 👈 THÊM MỚI
 }

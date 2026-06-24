@@ -8,21 +8,21 @@ import {
   Clock3, BookOpen, Phone, School, Badge,
   Sparkles, UserPlus, History, Check, X, Calendar, AlertCircle,
   MapPin, Users, Award, MessageSquare, Clock, FileText, User, Loader2,
-  RefreshCw
+  RefreshCw, ChevronLeft
 } from 'lucide-react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { teacherLeaveApi } from '../../../utils/api/teacherLeave.api';
-import type { TeacherLeave, PreviewAffectedSessionResponse, AvailableReplacementTeacher } from '../../../utils/types/teacherLeave';
+import { teacherApi } from '../../../utils/api/teacher.api'; // ✅ Import teacherApi
+import type { TeacherLeave, PreviewAffectedSessionResponse, AvailableReplacementTeacher, ReplacementWithSalary } from '../../../utils/types/teacherLeave';
+import type { Teacher } from '../../../utils/types/teacher'; // ✅ Import Teacher type
 import { LeaveApprovalModal } from '../../../components/adminComponents/leaves/LeaveApprovalModal';
 import { SessionsSummary } from '../../../components/adminComponents/leaves/SessionsSummary';
 import { SessionCard } from '../../../components/adminComponents/leaves/SessionCard';
 
-// Helper function để clean display name (copy từ LeaveDetailModal)
+// Helper function (GIỮ NGUYÊN)
 const cleanDisplayName = (name: string): string => {
   if (!name) return 'Chưa cập nhật';
-
   let cleaned = name;
-
   const patternsToRemove = [
     /com\.management\.student_center\.entity\.\w+(\$HibernateProxy)?/gi,
     /com\.management\.student_center\.dto\.\w+/gi,
@@ -30,33 +30,36 @@ const cleanDisplayName = (name: string): string => {
     /\$HibernateProxy/gi,
     /HibernateProxy/gi,
   ];
-
   for (const pattern of patternsToRemove) {
     cleaned = cleaned.replace(pattern, '');
   }
-
   if (cleaned.includes(' - ')) {
     const parts = cleaned.split(' - ');
     cleaned = parts[parts.length - 1];
   }
-
   cleaned = cleaned.trim();
-
   if (!cleaned || cleaned.length === 0 || cleaned === '-') {
     return 'Chưa cập nhật';
   }
-
   return cleaned;
 };
 
-// Helper để format time
 const formatTime = (timeStr?: string) => {
   if (!timeStr) return 'N/A';
   return timeStr.substring(0, 5);
 };
 
+// ✅ Helper lấy full image URL (copy từ TeacherDetailPage)
+const getFullImageUrl = (imagePath: string | null | undefined): string => {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http')) return imagePath;
+  const baseUrl = import.meta.env.VITE_BACKEND_URL_IMAGE || import.meta.env.VITE_BACKEND_URL || '';
+  const cleanBaseUrl = baseUrl.replace(/\/v1\/api$/, '');
+  const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  return `${cleanBaseUrl}${path}`;
+};
+
 export const LeaveRequestDetail = () => {
-  console.log('🎨 [Render] LeaveRequestDetail re-render at:', new Date().toLocaleTimeString());
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -72,74 +75,71 @@ export const LeaveRequestDetail = () => {
   const [loadingTeachersMap, setLoadingTeachersMap] = useState<Record<number, boolean>>({});
   const [assigningMap, setAssigningMap] = useState<Record<number, boolean>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-
-  const { setAlert } = useOutletContext<any>()
+  const { setAlert } = useOutletContext<any>();
+  
+  // ✅ State cho avatar
+  const [teacherAvatar, setTeacherAvatar] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const handleBack = () => {
     navigate('/admin/teacher/leave');
   };
 
-  // Parse reason to separate teacher reason and admin note
   const parseReason = (reason: string) => {
     if (!reason) return { teacherReason: 'Không có lý do cụ thể', adminNote: null };
-
     const adminPattern = /\[(ADMIN|Admin|admin)\]\s*:\s*(.*)$/i;
     const match = reason.match(adminPattern);
-
     if (match) {
       const adminNote = match[2].trim();
       const teacherReason = reason.replace(adminPattern, '').trim();
-      return {
-        teacherReason: teacherReason || 'Không có lý do cụ thể',
-        adminNote
-      };
+      return { teacherReason: teacherReason || 'Không có lý do cụ thể', adminNote };
     }
-
     return { teacherReason: reason, adminNote: null };
   };
 
-  // ✅ FIX: Merge sessions giống như LeaveDetailModal
+  // ✅ Hàm lấy ảnh giáo viên
+  const fetchTeacherAvatar = useCallback(async (userId: number) => {
+    try {
+      const response = await teacherApi.getAll(1, 1000);
+      if (response.success && response.data) {
+        const teacher = response.data.find((t: Teacher) => t.id === userId);
+        if (teacher && teacher.image) {
+          setTeacherAvatar(teacher.image);
+        } else {
+          setTeacherAvatar(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch teacher avatar:', error);
+      setTeacherAvatar(null);
+    }
+  }, []);
+
   const fetchAndMergeSessions = useCallback(async (leaveData: TeacherLeave) => {
     if (!leaveData?.id) return [];
-
     setLoadingSessions(true);
     try {
-      // Lấy dữ liệu trạng thái từ API
       const statusSessions = await teacherLeaveApi.getAffectedSessions(leaveData.id);
-      console.log('Status sessions from API:', statusSessions);
-
-      // Lấy dữ liệu chi tiết từ leave.affectedSessions
       const detailSessions = leaveData.affectedSessions || [];
-      console.log('Detail sessions from leave:', detailSessions);
-
-      // Tạo map để tra cứu nhanh trạng thái theo sessionId
       const statusMap = new Map();
       statusSessions.forEach((session: any) => {
         statusMap.set(session.sessionId, session);
       });
-
-      // Merge dữ liệu: lấy chi tiết từ detailSessions, trạng thái từ statusMap
       const merged = detailSessions.map((detail: any, index: number) => {
         const statusData = statusMap.get(detail.sessionId);
-
-        // ✅ Lấy affectedSessionId từ statusData (API trả về) hoặc từ detail
         const affectedSessionId = statusData?.id || detail.affectedSessionId || detail.id;
-
-        console.log(`🟢 Session ${detail.sessionId}: affectedSessionId = ${affectedSessionId}`);
-
         return {
           ...detail,
-          id: affectedSessionId,  // Đảm bảo có id
-          affectedSessionId: affectedSessionId,  // ✅ Thêm field này
+          id: affectedSessionId,
+          affectedSessionId: affectedSessionId,
           status: statusData?.status || detail.status || 'PENDING',
           replacementTeacherName: statusData?.replacementTeacherName || detail.replacementTeacherName || null,
           replacementTeacherId: statusData?.replacementTeacherId || detail.replacementTeacherId || null,
+          replacementSalary: statusData?.replacementSalary || detail.replacementSalary || null,
           assignedAt: statusData?.assignedAt || detail.assignedAt,
           respondedAt: statusData?.respondedAt || detail.respondedAt,
           declineReason: statusData?.declineReason || detail.declineReason,
           sessionHistory: statusData?.sessionHistory || detail.sessionHistory || [],
-          // Thêm các field cần thiết cho UI
           sessionId: detail.sessionId,
           sessionDate: detail.sessionDate,
           startTime: detail.startTime,
@@ -149,22 +149,19 @@ export const LeaveRequestDetail = () => {
           roomName: cleanDisplayName(detail.roomName || ''),
         };
       });
-
-      console.log('Merged sessions:', merged);
       setMergedSessions(merged);
       return merged;
-
     } catch (error) {
-      console.error('Failed to fetch sessions:', error);
-      // Fallback: chỉ dùng dữ liệu từ leave.affectedSessions
+      console.error('❌ Failed to fetch sessions:', error);
       const fallbackSessions = (leaveData.affectedSessions || []).map((session: any, index: number) => ({
         ...session,
         id: session.id || index,
-        affectedSessionId: session.id || index,  // ✅ Thêm fallback
+        affectedSessionId: session.id || index,
         subjectName: cleanDisplayName(session.subjectName),
         className: cleanDisplayName(session.className || ''),
         roomName: cleanDisplayName(session.roomName || ''),
         status: session.status || 'PENDING',
+        replacementSalary: session.replacementSalary || null,
       }));
       setMergedSessions(fallbackSessions);
       return fallbackSessions;
@@ -173,38 +170,33 @@ export const LeaveRequestDetail = () => {
     }
   }, []);
 
+  const isFetchingRef = useRef<boolean>(false);
   const fetchLeaveDetail = useCallback(async () => {
-    // ✅ Nếu đang fetch thì bỏ qua
-    if (isFetchingRef.current) {
-      console.log('⏭️ [fetchLeaveDetail] Bỏ qua - đang fetch dữ liệu');
-      return;
-    }
+    if (isFetchingRef.current) return;
     if (!id) return;
-    isFetchingRef.current = true;  // ✅ Đánh dấu đang fetch
-    console.log('📞 [fetchLeaveDetail] Bắt đầu fetch...');
+    isFetchingRef.current = true;
     try {
       setLoading(true);
       setError(null);
-
       const data = await teacherLeaveApi.getById(Number(id));
-      console.log('📞 [fetchLeaveDetail] Nhận dữ liệu:', data?.id);
       setLeave(data);
-
+      
+      // ✅ Lấy ảnh giáo viên
+      if (data?.teacherId) {
+        await fetchTeacherAvatar(data.teacherId);
+      }
+      
       await fetchAndMergeSessions(data);
-      console.log('📞 [fetchLeaveDetail] Hoàn tất');
-
     } catch (err: any) {
       console.error('❌ Fetch error:', err);
       setError(err.response?.data?.message || 'Không thể tải chi tiết đơn nghỉ');
     } finally {
       setLoading(false);
-      isFetchingRef.current = false;  // ✅ Đánh dấu đã fetch xong
-      console.log('📞 [fetchLeaveDetail] Kết thúc fetch');
+      isFetchingRef.current = false;
     }
-  }, [id, fetchAndMergeSessions]);
+  }, [id, fetchAndMergeSessions, fetchTeacherAvatar]);
 
   useEffect(() => {
-    console.log('🎬 [Mount] Component mounted, fetching initial data...');
     fetchLeaveDetail();
   }, []);
 
@@ -240,23 +232,19 @@ export const LeaveRequestDetail = () => {
   };
 
   const getLeaveTypeColor = () => {
-    if (!leave) return 'bg-primary/5 text-primary';
+    if (!leave) return 'bg-purple-50 text-purple-600';
     switch (leave.leaveType) {
-      case 'SICK': return 'bg-blue-100 text-blue-700';
-      case 'ANNUAL': return 'bg-emerald-100 text-emerald-700';
-      case 'UNPAID': return 'bg-amber-100 text-amber-700';
-      case 'PERSONAL': return 'bg-purple-100 text-purple-700';
-      default: return 'bg-primary/5 text-primary';
+      case 'SICK': return 'bg-blue-50 text-blue-600';
+      case 'ANNUAL': return 'bg-emerald-50 text-emerald-600';
+      case 'UNPAID': return 'bg-amber-50 text-amber-600';
+      case 'PERSONAL': return 'bg-purple-50 text-purple-600';
+      default: return 'bg-slate-50 text-slate-600';
     }
   };
 
-  const isFetchingRef = useRef<boolean>(false);
   const handleManualRefresh = async () => {
     if (isRefreshing) return;
-
     setIsRefreshing(true);
-    console.log('🔄 [Manual Refresh] Người dùng yêu cầu refresh...');
-
     try {
       await fetchLeaveDetail();
       setAlert?.({ type: 'success', message: 'Đã cập nhật trạng thái mới nhất' });
@@ -276,7 +264,7 @@ export const LeaveRequestDetail = () => {
           <motion.span
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+            className="bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full text-[10px] font-medium border border-emerald-200 flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-3 h-3" />
             Đã duyệt
@@ -287,7 +275,7 @@ export const LeaveRequestDetail = () => {
           <motion.span
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+            className="bg-red-50 text-red-600 px-2.5 py-0.5 rounded-full text-[10px] font-medium border border-red-200 flex items-center gap-1.5"
           >
             <XCircle className="w-3 h-3" />
             Từ chối
@@ -298,21 +286,19 @@ export const LeaveRequestDetail = () => {
           <motion.span
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+            className="bg-amber-50 text-amber-600 px-2.5 py-0.5 rounded-full text-[10px] font-medium border border-amber-200 flex items-center gap-1.5"
           >
-            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             Chờ duyệt
           </motion.span>
         );
     }
   };
-  const handleAssignTeacher = async (affectedSessionId: number, teacherId: number) => {
-    console.log('🎯 [AssignTeacher] Bắt đầu:', { affectedSessionId, teacherId });
-    setAssigningMap(prev => ({ ...prev, [affectedSessionId]: true }));
 
+  const handleAssignTeacher = async (affectedSessionId: number, teacherId: number, salary?: number) => {
+    setAssigningMap(prev => ({ ...prev, [affectedSessionId]: true }));
     try {
-      await teacherLeaveApi.assignTeacherToSession(affectedSessionId, teacherId);
-      console.log('✅ [AssignTeacher] Thành công');
+      await teacherLeaveApi.assignTeacherToSession(affectedSessionId, teacherId, salary);
       setAlert?.({ type: 'success', message: 'Đã phân công giáo viên dạy thay' });
       await fetchLeaveDetail();
     } catch (error: any) {
@@ -322,6 +308,7 @@ export const LeaveRequestDetail = () => {
       setAssigningMap(prev => ({ ...prev, [affectedSessionId]: false }));
     }
   };
+
   const handleCancelSession = async (affectedSessionId: number) => {
     if (!confirm('Bạn có chắc chắn muốn hủy buổi học này?')) return;
     try {
@@ -333,18 +320,13 @@ export const LeaveRequestDetail = () => {
     }
   };
 
-  // Trong LeaveRequestDetail.tsx, thêm useEffect để theo dõi thay đổi status
   const prevStatusRef = useRef<Record<number, string>>({});
-
   useEffect(() => {
-    // So sánh status cũ và mới của từng session
     mergedSessions.forEach(session => {
       const sessionId = session.affectedSessionId || session.id;
       const oldStatus = prevStatusRef.current[sessionId];
       const newStatus = session.status;
-
       if (oldStatus && oldStatus !== newStatus) {
-        // Status thay đổi, hiển thị notification
         if (newStatus === 'ASSIGNED') {
           setAlert?.({
             type: 'info',
@@ -353,7 +335,7 @@ export const LeaveRequestDetail = () => {
         } else if (newStatus === 'DECLINED') {
           setAlert?.({
             type: 'warning',
-            message: `Giáo viên ${session.replacementTeacherName} đã từ chối dạy thay buổi ${session.subjectName}. Vui lòng chọn giáo viên khác!`
+            message: `Giáo viên ${session.replacementTeacherName} đã từ chối dạy thay buổi ${session.subjectName}.`
           });
         } else if (newStatus === 'RESOLVED') {
           setAlert?.({
@@ -362,35 +344,22 @@ export const LeaveRequestDetail = () => {
           });
         }
       }
-
-      // Cập nhật ref
       prevStatusRef.current[sessionId] = newStatus;
     });
   }, [mergedSessions, setAlert]);
 
-
   const handleGetAvailableTeachers = async (affectedSessionId: number) => {
-    console.log('🔵 handleGetAvailableTeachers called with affectedSessionId:', affectedSessionId);
-    console.log('🔵 Type of affectedSessionId:', typeof affectedSessionId);
-
-    // ✅ Validation
     if (!affectedSessionId || isNaN(affectedSessionId) || affectedSessionId <= 0) {
-      console.error('❌ Invalid affectedSessionId:', affectedSessionId);
       setAlert?.({ type: 'error', message: 'ID session không hợp lệ' });
       return;
     }
-
     setLoadingTeachersMap(prev => ({ ...prev, [affectedSessionId]: true }));
     try {
       const teachers = await teacherLeaveApi.getAvailableReplacementTeachers(affectedSessionId);
-      console.log(`✅ Got ${teachers.length} teachers for session ${affectedSessionId}`);
       setAvailableTeachersMap(prev => ({ ...prev, [affectedSessionId]: teachers }));
     } catch (error: any) {
-      console.error('Failed to fetch teachers:', error);
-
-      // Xử lý lỗi 403 cụ thể
       if (error.response?.status === 403) {
-        setAlert?.({ type: 'error', message: 'Bạn không có quyền thực hiện thao tác này. Vui lòng đăng nhập với tài khoản Admin.' });
+        setAlert?.({ type: 'error', message: 'Bạn không có quyền thực hiện thao tác này.' });
       } else {
         setAlert?.({ type: 'error', message: error.response?.data?.message || 'Không thể tải danh sách giáo viên' });
       }
@@ -398,64 +367,53 @@ export const LeaveRequestDetail = () => {
       setLoadingTeachersMap(prev => ({ ...prev, [affectedSessionId]: false }));
     }
   };
-  const handleCancelAssignment = async (affectedSessionId: number) => {
-    console.log('🎯 [CancelAssignment] Bắt đầu:', affectedSessionId);
-    if (!confirm('Bạn có chắc chắn muốn hủy phân công này? Giáo viên sẽ không nhận được yêu cầu dạy thay.')) {
-      console.log('❌ [CancelAssignment] Người dùng hủy');
-      return;
-    }
 
+  const handleCancelAssignment = async (affectedSessionId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn hủy phân công này?')) return;
     try {
-      // TODO: Gọi API hủy phân công khi BE có
-      // await teacherLeaveApi.cancelAssignment(affectedSessionId);
-      console.log('✅ [CancelAssignment] Thành công (mock)');
+      const api: any = teacherLeaveApi;
+      if (typeof api.cancelAssignment === 'function') {
+        await api.cancelAssignment(affectedSessionId);
+      } else {
+        await teacherLeaveApi.cancelAffectedSession(affectedSessionId);
+      }
       await fetchLeaveDetail();
       setAlert?.({ type: 'success', message: 'Đã hủy phân công' });
     } catch (error: any) {
-      console.error('❌ [CancelAssignment] Lỗi:', error);
       setAlert?.({ type: 'error', message: error.message || 'Hủy phân công thất bại' });
     }
   };
+
   const { teacherReason, adminNote } = parseReason(leave?.reason || '');
+
+  // ✅ Lấy URL ảnh
+  const avatarUrl = teacherAvatar ? getFullImageUrl(teacherAvatar) : null;
+  const hasAvatar = teacherAvatar && !imageError && avatarUrl;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"
-          />
-          <p className="mt-4 text-gray-500">Đang tải thông tin...</p>
-        </motion.div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-200 border-t-purple-600 mx-auto" />
+          <p className="mt-3 text-xs text-slate-400">Đang tải thông tin...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-500 text-lg font-semibold">{error}</p>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <p className="text-sm font-medium text-slate-700">{error}</p>
+          <button
             onClick={handleBack}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all"
+            className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-all"
           >
             Quay lại
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
       </div>
     );
   }
@@ -463,62 +421,52 @@ export const LeaveRequestDetail = () => {
   if (!leave) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans antialiased">
-      <main className="max-w-[1440px] mx-auto px-12 py-8">
-        {/* Header Section - Giữ nguyên */}
+    <div className="min-h-screen bg-slate-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Breadcrumb & Header */}
         <motion.section
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-12"
+          className="mb-6"
         >
-          <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4 font-medium">
-            <motion.span
-              whileHover={{ x: -5 }}
-              className="hover:text-indigo-600 cursor-pointer transition-colors"
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
+            <button
               onClick={handleBack}
+              className="flex items-center gap-1 hover:text-purple-600 transition-colors"
             >
+              <ChevronLeft className="w-3.5 h-3.5" />
               Quản lý lịch nghỉ
-            </motion.span>
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-indigo-600 font-semibold">Chi tiết đơn</span>
-          </nav>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-                Chi tiết đơn xin nghỉ
-              </h1>
-              <div className="flex items-center gap-3">
+            </button>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-purple-600 font-medium">Chi tiết đơn</span>
+          </div>
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold text-slate-800">Chi tiết đơn xin nghỉ</h1>
                 {getStatusBadge()}
-                <span className="text-gray-400 text-sm">Mã đơn: #{leave.id}</span>
               </div>
+              <p className="text-xs text-slate-400">Mã đơn: #{leave.id}</p>
             </div>
-            <div className="flex items-center gap-3">
-              {/* ✅ THÊM NÚT REFRESH */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+            
+            <div className="flex items-center gap-2">
+              <button
                 onClick={handleManualRefresh}
                 disabled={isRefreshing}
-                className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-medium hover:bg-slate-50 transition-all disabled:opacity-50"
               >
                 {isRefreshing ? (
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={13} className="animate-spin" />
                 ) : (
-                  <RefreshCw size={18} />
+                  <RefreshCw size={13} />
                 )}
                 {isRefreshing ? 'Đang cập nhật...' : 'Làm mới'}
-              </motion.button>
+              </button>
+              
               {leave.status === 'PENDING' && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="flex items-center gap-3"
-                >
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                <div className="flex items-center gap-2">
+                  <button
                     onClick={async () => {
                       if (window.confirm('Bạn có chắc chắn muốn từ chối đơn này?')) {
                         try {
@@ -529,172 +477,152 @@ export const LeaveRequestDetail = () => {
                         }
                       }
                     }}
-                    className="px-6 py-3 rounded-xl border-2 border-red-200 bg-white text-red-600 font-semibold hover:bg-red-50 hover:border-red-300 transition-all flex items-center gap-2 shadow-sm"
+                    className="px-3.5 py-1.5 rounded-lg border border-red-200 bg-white text-red-500 text-xs font-medium hover:bg-red-50 transition-all"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-3.5 h-3.5 inline mr-1" />
                     Từ chối
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  </button>
+                  <button
                     onClick={() => setApprovalModalOpen(true)}
-                    className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200 hover:shadow-xl transition-all flex items-center gap-2"
+                    className="px-3.5 py-1.5 rounded-lg btn-gradient from-purple-500 to-purple-600 text-white text-xs font-medium shadow-sm shadow-purple-200 hover:shadow-md transition-all"
                   >
-                    <Check className="w-5 h-5" />
+                    <Check className="w-3.5 h-3.5 inline mr-1" />
                     Phê duyệt
-                  </motion.button>
-                </motion.div>
+                  </button>
+                </div>
               )}
             </div>
           </div>
         </motion.section>
 
-        {/* Grid Layout */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           {/* Left Column */}
-          <div className="xl:col-span-2 space-y-8">
-            {/* Teacher Profile Card - Giữ nguyên */}
+          <div className="xl:col-span-2 space-y-5">
+            {/* Teacher Profile Card - ✅ Có ảnh */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-              whileHover={{ y: -4 }}
-              className="bg-white rounded-2xl p-8 flex items-start gap-6 shadow-sm relative overflow-hidden group transition-all duration-300"
+              className="bg-white rounded-xl p-5 flex items-start gap-5 shadow-sm border border-slate-200"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-              <div className="w-24 h-24 rounded-2xl bg-indigo-100 overflow-hidden ring-4 ring-white shadow-md flex-shrink-0 flex items-center justify-center">
-                {leave.teacherName ? (
-                  <div className="w-full h-full bg-indigo-200 flex items-center justify-center">
-                    <User className="w-12 h-12 text-indigo-500" />
-                  </div>
-                ) : (
-                  <User className="w-12 h-12 text-indigo-500" />
-                )}
+              <div className="relative group">
+                <div className="h-16 w-16 rounded-xl overflow-hidden ring-2 ring-purple-100 group-hover:ring-purple-300 transition-all flex-shrink-0">
+                  {hasAvatar ? (
+                    <img
+                      src={avatarUrl}
+                      alt={leave.teacherName}
+                      className="w-full h-full object-cover"
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <div className="w-full h-full btn-gradient from-purple-100 to-purple-50 flex items-center justify-center">
+                      <User className="h-7 w-7 text-purple-600" />
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <h2 className="text-2xl font-bold text-gray-900">{leave.teacherName}</h2>
-                  <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-indigo-100">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="text-base font-semibold text-slate-800">{leave.teacherName}</h2>
+                  <span className="text-[10px] font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
                     Giảng viên
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Badge className="w-4 h-4 text-indigo-400" />
-                    <span>Mã GV: <span className="font-medium text-gray-700">{leave.teacherId}</span></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Mail className="w-4 h-4 text-indigo-400" />
-                    <span className="truncate">{leave.teacherEmail}</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Badge className="w-3 h-3 text-purple-400" />
+                    Mã GV: <span className="font-medium text-slate-600">{leave.teacherId}</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Mail className="w-3 h-3 text-purple-400" />
+                    <span className="truncate max-w-[180px]">{leave.teacherEmail}</span>
+                  </span>
                 </div>
               </div>
             </motion.div>
 
             {/* Leave Details Card - Giữ nguyên */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              whileHover={{ y: -4 }}
-              className="bg-white rounded-2xl p-8 shadow-sm space-y-8 transition-all duration-300"
+              transition={{ delay: 0.05 }}
+              className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 space-y-5"
             >
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900">
-                  <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                  Thông tin nghỉ phép
-                </h3>
-                <span className={`font-bold text-sm py-1.5 px-4 rounded-lg shadow-sm ${getLeaveTypeColor()}`}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-5 bg-purple-500 rounded-full" />
+                  <h3 className="text-sm font-semibold text-slate-700">Thông tin nghỉ phép</h3>
+                </div>
+                <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full border ${getLeaveTypeColor()}`}>
                   {getLeaveTypeLabel()}
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <Calendar className="w-3.5 h-3.5" />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                    <Calendar className="w-3 h-3" />
                     Bắt đầu
                   </div>
-                  <p className="text-lg font-bold text-gray-900">{leave.startDate}</p>
+                  <p className="text-sm font-semibold text-slate-700 mt-0.5">{leave.startDate}</p>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <Calendar className="w-3.5 h-3.5" />
+                <div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                    <Calendar className="w-3 h-3" />
                     Kết thúc
                   </div>
-                  <p className="text-lg font-bold text-gray-900">{leave.endDate}</p>
+                  <p className="text-sm font-semibold text-slate-700 mt-0.5">{leave.endDate}</p>
                 </div>
-                <div className="space-y-2 bg-indigo-50 p-4 rounded-xl">
-                  <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold uppercase tracking-wider">
-                    <Clock className="w-3.5 h-3.5" />
+                <div className="bg-purple-50 p-3 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-500 uppercase tracking-wide">
+                    <Clock className="w-3 h-3" />
                     Tổng ngày
                   </div>
-                  <p className="text-3xl font-black text-indigo-600">{calculateTotalDays()} <span className="text-sm font-medium">ngày</span></p>
+                  <p className="text-xl font-bold text-purple-600">{calculateTotalDays()} <span className="text-xs font-medium">ngày</span></p>
                 </div>
               </div>
 
-              {/* Reason Section - Giữ nguyên */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="relative bg-gray-50 rounded-xl p-6"
-              >
-                <Quote className="absolute -top-3 -left-3 text-indigo-200 w-8 h-8 bg-white rounded-full p-1" />
-                <blockquote className="pl-6">
-                  <p className="text-base italic font-medium text-gray-600 leading-relaxed">
-                    "{teacherReason}"
-                  </p>
-                  {adminNote && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="mt-4 pt-3 border-t border-gray-200"
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <MessageSquare className="w-3 h-3 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Ghi chú từ Admin</p>
-                          <p className="text-sm text-gray-600 mt-0.5">{adminNote}</p>
-                        </div>
+              {/* Reason */}
+              <div className="bg-slate-50 rounded-lg p-4">
+                <Quote className="w-4 h-4 text-purple-300 mb-1" />
+                <p className="text-sm text-slate-600 italic leading-relaxed">"{teacherReason}"</p>
+                {adminNote && (
+                  <div className="mt-2 pt-2 border-t border-slate-200">
+                    <div className="flex items-start gap-1.5">
+                      <MessageSquare className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] font-medium text-amber-600 uppercase tracking-wide">Ghi chú Admin</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{adminNote}</p>
                       </div>
-                    </motion.div>
-                  )}
-                </blockquote>
-              </motion.div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
 
-            {/* ✅ FIX: Affected Classes Section - NEW VERSION with SessionCard */}
+            {/* Affected Sessions - Giữ nguyên */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="space-y-4"
+              transition={{ delay: 0.1 }}
+              className="space-y-3"
             >
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900">
-                  <div className="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-                  Buổi học bị ảnh hưởng
-                  <span className="ml-2 text-sm font-normal text-gray-500">
-                    ({mergedSessions.length} buổi)
-                  </span>
-                </h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-5 bg-amber-500 rounded-full" />
+                  <h3 className="text-sm font-semibold text-slate-700">Buổi học bị ảnh hưởng</h3>
+                  <span className="text-[10px] text-slate-400">({mergedSessions.length})</span>
+                </div>
               </div>
 
-              {/* ✅ Summary Stats */}
               <SessionsSummary sessions={mergedSessions} />
 
-              {/* Loading state for sessions */}
               {loadingSessions && (
-                <div className="flex justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                <div className="flex justify-center py-4">
+                  <Loader2 size={18} className="animate-spin text-purple-500" />
                 </div>
               )}
 
-              {/* Session Cards */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <AnimatePresence>
                   {mergedSessions.length > 0 ? (
                     mergedSessions.map((session, idx) => (
@@ -704,209 +632,162 @@ export const LeaveRequestDetail = () => {
                         index={idx}
                         availableTeachers={availableTeachersMap[session.affectedSessionId || session.id] || []}
                         isLoadingTeachers={loadingTeachersMap[session.affectedSessionId || session.id] || false}
-                        isAssigning={assigningMap[session.affectedSessionId || session.id] || false}  // ✅ Thêm
+                        isAssigning={assigningMap[session.affectedSessionId || session.id] || false}
                         onAssignTeacher={handleAssignTeacher}
                         onCancelSession={handleCancelSession}
-                        onResendRequest={undefined}  // Có thể implement sau
-                        onCancelAssignment={handleCancelAssignment}  // ✅ Thêm nếu có
+                        onResendRequest={undefined}
+                        onCancelAssignment={handleCancelAssignment}
                         onGetAvailableTeachers={handleGetAvailableTeachers}
                         onRefresh={handleManualRefresh}
                       />
                     ))
                   ) : (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="bg-white rounded-2xl p-8 text-center text-gray-500 border-2 border-dashed border-gray-200"
-                    >
-                      <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p>Không có buổi học nào bị ảnh hưởng</p>
-                    </motion.div>
+                    <div className="bg-white rounded-xl p-8 text-center border-2 border-dashed border-slate-200">
+                      <CalendarDays className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-400">Không có buổi học nào bị ảnh hưởng</p>
+                    </div>
                   )}
                 </AnimatePresence>
               </div>
             </motion.div>
           </div>
 
-          {/* Right Column - Giữ nguyên phần lớn, chỉ sửa AI Suggestions nếu cần */}
-          <div className="space-y-8">
-            {/* AI Suggestions - Giữ nguyên */}
+          {/* Right Column - Giữ nguyên */}
+          <div className="space-y-5">
+            {/* AI Suggestions */}
             {leave.status === 'PENDING' && mergedSessions.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-indigo-100 relative overflow-hidden"
+                className="bg-white rounded-xl p-4 shadow-sm border border-purple-100"
               >
-                <div className="absolute -top-6 -right-6 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
-                <div className="flex items-center gap-2 mb-4">
-                  <motion.div
-                    whileHover={{ rotate: 360 }}
-                    transition={{ duration: 0.5 }}
-                    className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center"
-                  >
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </motion.div>
-                  <h3 className="font-bold text-lg text-gray-900">AI Gợi ý dạy thay</h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-lg bg-amber-400 flex items-center justify-center">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-700">AI Gợi ý dạy thay</h3>
                 </div>
-                <p className="text-xs text-gray-500 mb-5 leading-relaxed bg-gray-50 p-3 rounded-lg">
-                  Phân tích dựa trên chuyên môn tương đồng và lịch trống của giảng viên trong khoa.
+                <p className="text-[10px] text-slate-400 mb-3 bg-slate-50 p-2 rounded-lg">
+                  Phân tích dựa trên chuyên môn và lịch trống
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {mergedSessions.slice(0, 2).map((session, idx) => (
-                    <motion.div
+                    <div
                       key={idx}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + idx * 0.1 }}
-                      whileHover={{ scale: 1.02 }}
-                      className="p-3 rounded-xl hover:bg-indigo-50/50 transition-all cursor-pointer group border border-gray-100 hover:border-indigo-200"
+                      className="p-2.5 rounded-lg bg-slate-50 hover:bg-purple-50 transition-all border border-slate-100"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold shadow-sm">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-semibold text-xs">
                           {session.subjectName?.charAt(0) || 'M'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate">{session.subjectName}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Award className="w-3 h-3 text-indigo-500" />
-                            <p className="text-[10px] text-indigo-600 font-semibold">Tiết {formatTime(session.startTime)} - {formatTime(session.endTime)}</p>
-                          </div>
+                          <p className="text-xs font-medium text-slate-700 truncate">{session.subjectName}</p>
+                          <p className="text-[10px] text-purple-500">Tiết {formatTime(session.startTime)}</p>
                         </div>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
+                        <button
                           onClick={() => fetchAvailableTeachers(session.affectedSessionId || session.id)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-indigo-600 group-hover:text-white transition-all flex items-center justify-center shadow-sm"
+                          className="h-7 w-7 rounded-lg bg-slate-200 text-slate-500 hover:bg-purple-500 hover:text-white transition-all flex items-center justify-center"
                           disabled={suggestionsLoading}
                         >
-                          {suggestionsLoading ? <Loader2 size={14} className="animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                        </motion.button>
+                          {suggestionsLoading ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+                        </button>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               </motion.div>
             )}
 
-            {/* Timeline Section - Giữ nguyên */}
+            {/* Timeline - Giữ nguyên */}
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="bg-white rounded-2xl p-6 shadow-sm"
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-xl p-4 shadow-sm border border-slate-200"
             >
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-8 h-8 rounded-xl bg-gray-400 flex items-center justify-center">
-                  <History className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-7 w-7 rounded-lg bg-slate-200 flex items-center justify-center">
+                  <History className="h-3.5 w-3.5 text-slate-500" />
                 </div>
-                <h3 className="font-bold text-lg text-gray-900">Lịch sử đơn nghỉ</h3>
+                <h3 className="text-sm font-semibold text-slate-700">Lịch sử</h3>
               </div>
-              <div className="space-y-6 relative">
-                <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-200"></div>
+              <div className="space-y-4 relative">
+                <div className="absolute left-2.5 top-2 bottom-2 w-0.5 bg-slate-200" />
 
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="relative pl-9"
-                >
-                  <div className="absolute left-0 top-0.5 w-6 h-6 rounded-full bg-indigo-600 border-4 border-white shadow-md flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
+                <div className="relative pl-7">
+                  <div className="absolute left-0 top-0.5 h-5 w-5 rounded-full bg-purple-500 border-2 border-white shadow-sm flex items-center justify-center">
+                    <Check className="h-2.5 w-2.5 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">Đã gửi đơn</p>
-                    <p className="text-xs text-gray-500 mt-1">Giáo viên {leave.teacherName} tạo đơn nghỉ phép.</p>
-                    <time className="text-[10px] text-gray-400 mt-2 block flex items-center gap-1">
-                      <Calendar className="w-2.5 h-2.5" />
+                    <p className="text-xs font-medium text-slate-700">Đã gửi đơn</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Giáo viên tạo đơn</p>
+                    <time className="text-[9px] text-slate-400 mt-1 block">
                       {new Date(leave.createdAt).toLocaleString('vi-VN')}
                     </time>
                   </div>
-                </motion.div>
+                </div>
 
                 {leave.status !== 'PENDING' && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="relative pl-9"
-                  >
-                    <div className={`absolute left-0 top-0.5 w-6 h-6 rounded-full border-4 border-white shadow-md flex items-center justify-center ${leave.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-red-500'
-                      }`}>
+                  <div className="relative pl-7">
+                    <div className={`absolute left-0 top-0.5 h-5 w-5 rounded-full border-2 border-white shadow-sm flex items-center justify-center ${leave.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-red-500'}`}>
                       {leave.status === 'APPROVED' ? (
-                        <CheckCircle2 className="w-3 h-3 text-white" />
+                        <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                       ) : (
-                        <X className="w-3 h-3 text-white" />
+                        <X className="h-2.5 w-2.5 text-white" />
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{leave.status === 'APPROVED' ? 'Đơn được duyệt' : 'Đơn bị từ chối'}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {leave.status === 'APPROVED'
-                          ? `Đơn xin nghỉ đã được phê duyệt bởi ${leave.approverName || 'quản trị viên'}.`
-                          : 'Đơn xin nghỉ không được chấp thuận.'}
+                      <p className="text-xs font-medium text-slate-700">{leave.status === 'APPROVED' ? 'Đã duyệt' : 'Từ chối'}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {leave.status === 'APPROVED' ? 'Đã phê duyệt' : 'Không được chấp thuận'}
                       </p>
                       {leave.approvedAt && (
-                        <time className="text-[10px] text-gray-400 mt-2 block flex items-center gap-1">
-                          <Calendar className="w-2.5 h-2.5" />
+                        <time className="text-[9px] text-slate-400 mt-1 block">
                           {new Date(leave.approvedAt).toLocaleString('vi-VN')}
                         </time>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {leave.status === 'PENDING' && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="relative pl-9"
-                  >
-                    <div className="absolute left-0 top-0.5 w-6 h-6 rounded-full bg-amber-400 border-4 border-white shadow-md flex items-center justify-center animate-pulse">
-                      <Clock className="w-3 h-3 text-white" />
+                  <div className="relative pl-7">
+                    <div className="absolute left-0 top-0.5 h-5 w-5 rounded-full bg-amber-400 border-2 border-white shadow-sm flex items-center justify-center animate-pulse">
+                      <Clock className="h-2.5 w-2.5 text-white" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-900">Admin xem xét</p>
-                      <p className="text-xs text-gray-500 mt-1">Đang chờ xác nhận từ bộ môn.</p>
-                      <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="w-3 h-3 text-amber-600" />
-                          <p className="text-[11px] text-amber-700 italic">"Đang chờ phê duyệt từ quản trị viên."</p>
-                        </div>
+                      <p className="text-xs font-medium text-slate-700">Đang xem xét</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Chờ phê duyệt từ Admin</p>
+                      <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
+                        <p className="text-[10px] text-amber-600 italic">"Đang chờ phê duyệt"</p>
                       </div>
-                      <time className="text-[10px] text-gray-400 mt-2 block flex items-center gap-1">
-                        <Clock3 className="w-2.5 h-2.5" />
-                        Đang chờ xử lý
-                      </time>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </motion.div>
 
-            {/* Quick Stats Card - Giữ nguyên */}
+            {/* Quick Stats - Giữ nguyên */}
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              whileHover={{ y: -4 }}
-              className="bg-indigo-50 rounded-2xl p-6 border border-indigo-100"
+              transition={{ delay: 0.15 }}
+              className="bg-purple-50 rounded-xl p-4 border border-purple-100"
             >
-              <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Award className="w-3.5 h-3.5" />
+              <h4 className="text-[10px] font-medium text-purple-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Award className="w-3 h-3" />
                 Thông tin thêm
               </h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Ngày tạo đơn</span>
-                  <span className="text-sm font-medium text-gray-900">
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Ngày tạo</span>
+                  <span className="font-medium text-slate-700">
                     {new Date(leave.createdAt).toLocaleDateString('vi-VN')}
                   </span>
                 </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-sm text-gray-600">Cập nhật lần cuối</span>
-                  <span className="text-sm font-medium text-gray-900">
+                <div className="flex justify-between pt-1.5 border-t border-purple-100">
+                  <span className="text-slate-500">Cập nhật</span>
+                  <span className="font-medium text-slate-700">
                     {new Date(leave.updatedAt).toLocaleDateString('vi-VN')}
                   </span>
                 </div>
@@ -916,6 +797,7 @@ export const LeaveRequestDetail = () => {
         </div>
       </main>
 
+      {/* Approval Modal - GIỮ NGUYÊN */}
       <LeaveApprovalModal
         isOpen={approvalModalOpen}
         onClose={() => setApprovalModalOpen(false)}
@@ -924,28 +806,39 @@ export const LeaveRequestDetail = () => {
         leaveDate={leave ? `${leave.startDate} - ${leave.endDate}` : ''}
         reason={leave?.reason || ''}
         affectedSessions={mergedSessions}
-        onApprove={async (options) => {
+        onApprove={async (options: {
+          approvalType: 'full_leave' | 'flexible';
+          replacements: ReplacementWithSalary[];
+          cancelledSessions: string[];
+          comment: string;
+        }) => {
           setIsSubmitting(true);
           try {
-            let replacementsArray = undefined;
-            if (options.approvalType === 'flexible') {
-              replacementsArray = Object.entries(options.replacements)
-                .filter(([, teacherId]) => teacherId && teacherId !== '')
-                .map(([sessionId, teacherId]) => ({
-                  sessionId: Number(sessionId),
-                  replacementTeacherId: Number(teacherId),
+            let replacementsArray: ReplacementWithSalary[] | undefined = undefined;
+            if (options.approvalType === 'flexible' && options.replacements.length > 0) {
+              replacementsArray = options.replacements
+                .filter(r => r.replacementTeacherId && r.replacementTeacherId > 0)
+                .map(r => ({
+                  sessionId: r.sessionId,
+                  replacementTeacherId: r.replacementTeacherId,
+                  salary: r.salary || undefined,
                 }));
+            }
+            let affectType: 'CANCEL' | 'REPLACE' = 'CANCEL';
+            if (options.approvalType === 'flexible' && replacementsArray && replacementsArray.length > 0) {
+              affectType = 'REPLACE';
             }
             await teacherLeaveApi.approve(leave.id, {
               action: 'APPROVED',
-              affectType: options.approvalType === 'full_leave' ? 'CANCEL' : 'REPLACE',
+              affectType: affectType,
               comment: options.comment,
               replacements: replacementsArray,
             });
             setApprovalModalOpen(false);
             fetchLeaveDetail();
+            setAlert?.({ type: 'success', message: 'Đã phê duyệt đơn nghỉ' });
           } catch (err: any) {
-            setError(err.message || 'Phê duyệt thất bại');
+            setAlert?.({ type: 'error', message: err.message || 'Phê duyệt thất bại' });
           } finally {
             setIsSubmitting(false);
           }

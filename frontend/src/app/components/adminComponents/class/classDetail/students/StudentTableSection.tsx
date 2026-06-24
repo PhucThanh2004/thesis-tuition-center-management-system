@@ -1,33 +1,40 @@
-// StudentTableSection.tsx
+// StudentTableSection.tsx (phần cập nhật)
 import { useState, useMemo, useEffect } from "react";
 import { Search, Plus, Users } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { cn } from "../../../../../utils/cn";
 import { studentSubjectApi } from "../../../../../utils/api";
 import type { Subject } from "../../../../../utils/types/subject";
 import type { StudentSubject } from "../../../../../utils/types/studentSubject";
+import type { CurriculumEvaluation } from "../../../../../utils/types/evaluation";
 import { StudentCard } from "./StudentCard";
 import { StudentDetailPanel } from "./StudentDetailPanel";
 import { SkeletonCard } from "./SkeletonCard";
 import { EmptyState } from "./EmptyState";
 import { AddStudentModal } from "../AddStudentModal";
+import { evaluationApi } from "../../../../../utils/api/evaluation.api";
 
 type Props = {
   subject: Subject | null;
   isTeacher?: boolean;
 };
 
+// Interface mở rộng cho student kèm tiến độ
+interface StudentWithProgress extends StudentSubject {
+  overallProgress: number;
+}
+
 export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState("default");
-  const [students, setStudents] = useState<StudentSubject[]>([]);
+  const [students, setStudents] = useState<StudentWithProgress[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<Record<number, boolean>>({});
   const [openModal, setOpenModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentSubject | null>(null);
-  const [showAllStudents, setShowAllStudents] = useState(false);
   const { setAlert } = useOutletContext<any>();
 
+  // Fetch danh sách students
   useEffect(() => {
     if (!subject) return;
 
@@ -35,7 +42,16 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
       try {
         setLoading(true);
         const res = await studentSubjectApi.getStudentBySubject(subject.id);
-        setStudents(res.data);
+        const studentsData = res.data;
+        
+        // Khởi tạo students với progress mặc định là 0
+        setStudents(studentsData.map((s: StudentSubject) => ({
+          ...s,
+          overallProgress: 0
+        })));
+        
+        // Fetch progress cho từng student
+        await fetchAllStudentsProgress(studentsData);
       } catch (err) {
         console.error(err);
       } finally {
@@ -45,6 +61,89 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
 
     fetchStudents();
   }, [subject?.id]);
+
+  // Fetch progress cho tất cả students
+  const fetchAllStudentsProgress = async (studentsData: StudentSubject[]) => {
+    if (!subject) return;
+
+    // Đánh dấu đang loading cho từng student
+    const loadingStates: Record<number, boolean> = {};
+    studentsData.forEach(s => { loadingStates[s.id] = true; });
+    setLoadingProgress(loadingStates);
+
+    try {
+      // Fetch curriculum evaluations cho từng student
+      const progressPromises = studentsData.map(async (student) => {
+        try {
+          const curriculumEvals = await evaluationApi.getCurriculumEvaluations(student.id, subject.id);
+          
+          // Tính tiến độ trung bình từ các curriculum
+          let avgProgress = 0;
+          let hasAnyEvaluation = false;
+          
+          if (curriculumEvals.length > 0) {
+            // Kiểm tra xem có curriculum nào có đánh giá thực tế không
+            // (overallProgress > 0 HOẶC có teacherNotes HOẶC có strengths/weaknesses)
+            hasAnyEvaluation = curriculumEvals.some(c => 
+              c.overallProgress > 0 || 
+              (c.teacherNotes && c.teacherNotes.trim() !== '') ||
+              (c.strengths && c.strengths.trim() !== '') ||
+              (c.weaknesses && c.weaknesses.trim() !== '')
+            );
+            
+            const totalProgress = curriculumEvals.reduce((sum, c) => sum + (c.overallProgress || 0), 0);
+            avgProgress = Math.round(totalProgress / curriculumEvals.length);
+          }
+          
+          return { 
+            studentId: student.id, 
+            progress: avgProgress,
+            hasAnyEvaluation: hasAnyEvaluation
+          };
+        } catch (error) {
+          console.error(`Error fetching progress for student ${student.id}:`, error);
+          return { 
+            studentId: student.id, 
+            progress: 0, 
+            hasAnyEvaluation: false 
+          };
+        }
+      });
+
+      const results = await Promise.all(progressPromises);
+      
+      // Cập nhật state students với progress và hasAnyEvaluation
+      setStudents(prev => prev.map(student => {
+        const result = results.find(r => r.studentId === student.id);
+        return {
+          ...student,
+          overallProgress: result?.progress || 0,
+          hasAnyEvaluation: result?.hasAnyEvaluation || false
+        };
+      }));
+    } catch (error) {
+      console.error("Error fetching students progress:", error);
+    } finally {
+      setLoadingProgress({});
+    }
+  };
+
+  // Fetch progress cho một student cụ thể (khi cần refresh)
+  const fetchStudentProgress = async (studentId: number) => {
+    if (!subject) return 0;
+    
+    try {
+      const curriculumEvals = await evaluationApi.getCurriculumEvaluations(studentId, subject.id);
+      if (curriculumEvals.length > 0) {
+        const totalProgress = curriculumEvals.reduce((sum, c) => sum + (c.overallProgress || 0), 0);
+        return Math.round(totalProgress / curriculumEvals.length);
+      }
+      return 0;
+    } catch (error) {
+      console.error(`Error fetching progress for student ${studentId}:`, error);
+      return 0;
+    }
+  };
 
   const filteredStudents = useMemo(() => {
     let result = students.filter(
@@ -59,10 +158,20 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
       result = [...result].sort((a, b) => b.fullName.localeCompare(a.fullName));
     }
 
+    // Sắp xếp theo tiến độ (có thể thêm sau)
+    if (sortOption === "progressAsc") {
+      result = [...result].sort((a, b) => a.overallProgress - b.overallProgress);
+    }
+    
+    if (sortOption === "progressDesc") {
+      result = [...result].sort((a, b) => b.overallProgress - a.overallProgress);
+    }
+
     return result;
   }, [students, searchQuery, sortOption]);
 
-  const displayedStudents = showAllStudents ? filteredStudents : filteredStudents.slice(0, 5);
+  // Luôn hiển thị tất cả students, không cắt bớt
+  const displayedStudents = filteredStudents;
 
   const handleRemoveStudent = async (studentId: number) => {
     if (!subject) return;
@@ -105,8 +214,23 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
   const refreshStudents = async () => {
     if (subject) {
       const res = await studentSubjectApi.getStudentBySubject(subject.id);
-      setStudents(res.data);
+      const studentsData = res.data;
+      
+      setStudents(studentsData.map((s: StudentSubject) => ({
+        ...s,
+        overallProgress: 0
+      })));
+      
+      await fetchAllStudentsProgress(studentsData);
     }
+  };
+
+  // Refresh progress cho một student cụ thể (khi có cập nhật từ detail panel)
+  const refreshStudentProgress = async (studentId: number) => {
+    const newProgress = await fetchStudentProgress(studentId);
+    setStudents(prev => prev.map(s => 
+      s.id === studentId ? { ...s, overallProgress: newProgress } : s
+    ));
   };
 
   return (
@@ -124,6 +248,19 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
                 className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 w-44 sm:w-56 bg-white"
               />
             </div>
+
+            {/* Thêm dropdown sort */}
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/20 bg-white"
+            >
+              <option value="default">Mặc định</option>
+              <option value="nameAsc">Tên A-Z</option>
+              <option value="nameDesc">Tên Z-A</option>
+              <option value="progressDesc">Tiến độ cao nhất</option>
+              <option value="progressAsc">Tiến độ thấp nhất</option>
+            </select>
 
             {!isTeacher && (
               <button
@@ -146,14 +283,6 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
               </span>
               <span className="text-xs text-slate-400">({filteredStudents.length})</span>
             </div>
-            {filteredStudents.length > 5 && (
-              <button
-                onClick={() => setShowAllStudents(!showAllStudents)}
-                className="text-xs font-medium text-violet-600 hover:text-violet-700 transition-colors"
-              >
-                {showAllStudents ? "Thu gọn" : "Xem tất cả"}
-              </button>
-            )}
           </div>
 
           <div className="p-4 space-y-2">
@@ -184,6 +313,7 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
                     onEdit={() => handleEditStudent(student)}
                     onRemove={() => handleRemoveStudent(student.id)}
                     isTeacher={isTeacher}
+                    overallProgress={student.overallProgress}
                   />
                 ))}
               </AnimatePresence>
@@ -193,28 +323,6 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
           {filteredStudents.length > 0 && (
             <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50/30">
               <span>Hiển thị {displayedStudents.length} / {filteredStudents.length} học sinh</span>
-              {filteredStudents.length > 5 && (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setShowAllStudents(false)}
-                    className={cn(
-                      "px-2 py-0.5 rounded transition-colors",
-                      !showAllStudents ? "bg-violet-50 text-violet-600 font-medium" : "hover:bg-slate-100"
-                    )}
-                  >
-                    Thu gọn
-                  </button>
-                  <button
-                    onClick={() => setShowAllStudents(true)}
-                    className={cn(
-                      "px-2 py-0.5 rounded transition-colors",
-                      showAllStudents ? "bg-violet-50 text-violet-600 font-medium" : "hover:bg-slate-100"
-                    )}
-                  >
-                    Tất cả
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -225,6 +333,7 @@ export const StudentTableSection = ({ subject, isTeacher = false }: Props) => {
           student={selectedStudent}
           subject={subject}
           onClose={() => setSelectedStudent(null)}
+          onProgressUpdate={refreshStudentProgress}
         />
       </div>
 

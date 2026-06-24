@@ -34,6 +34,7 @@ export const CourseOverviewSection = ({ subject, onEdit, isTeacher = false }: Pr
     // Mock stats data (replace with real data from API)
     const stats = {
         totalStudents: subject.currentStudents || 0,
+        maxStudents: subject.maxStudents || 0,
         progress: 65,
         attendance: 94.2,
         revenue: (subject.price || 0) * (subject.currentStudents || 0) * 4,
@@ -44,13 +45,13 @@ export const CourseOverviewSection = ({ subject, onEdit, isTeacher = false }: Pr
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="relative overflow-hidden bg-white rounded-2xl border border-slate-200/50 shadow-sm"
+            className="relative overflow-hidden rounded-2xl "
         >
             {/* Decorative gradient background */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-violet-50/30 to-indigo-50/30 rounded-full blur-3xl -z-0" />
 
             <div className="relative z-10 p-6">
-                {/* HEADER */}
+                {/* HEADER - Giữ nguyên */}
                 <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
                     <div className="flex gap-4">
                         {/* Icon with gradient */}
@@ -119,54 +120,41 @@ export const CourseOverviewSection = ({ subject, onEdit, isTeacher = false }: Pr
                             </div>
                         </div>
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={onEdit}
-                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
-                        >
-                            Chỉnh sửa
-                        </motion.button>
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-emerald-600 hover:shadow-md transition-all"
-                        >
-                            Xuất báo cáo
-                        </motion.button>
-                    </div>
                 </div>
 
-                {/* STATS GRID */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                {/* STATS GRID - Smaller cards with spread out gradients */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                     <StatCard
                         label="Tổng học sinh"
                         value={stats.totalStudents.toString()}
-                        subtext="+2% tháng này"
-                        icon={<Users size={16} />}
+                        maxValue={stats.maxStudents}
+                        subtext="+12% so với tháng trước"
+                        icon={<Users size={14} />}
                         trend="up"
+                        color="violet"
                     />
                     <StatCard
                         label="Tiến độ khóa học"
                         value={`${stats.progress}%`}
                         progress={stats.progress}
-                        icon={<TrendingUp size={16} />}
+                        subtext="24/36 bài học"
+                        icon={<TrendingUp size={14} />}
+                        color="blue"
                     />
                     <StatCard
                         label="Tỷ lệ chuyên cần"
                         value={`${stats.attendance}%`}
                         subtext="+5.2%"
-                        icon={<Award size={16} />}
+                        icon={<Award size={14} />}
                         trend="up"
+                        color="emerald"
                     />
                     <StatCard
                         label="Doanh thu dự kiến"
                         value={`${(stats.revenue / 1000000).toFixed(1)}M`}
-                        subtext="VNĐ"
-                        icon={<DollarSign size={16} />}
+                        subtext="VNĐ / tháng"
+                        icon={<DollarSign size={14} />}
+                        color="amber"
                     />
                 </div>
             </div>
@@ -174,70 +162,123 @@ export const CourseOverviewSection = ({ subject, onEdit, isTeacher = false }: Pr
     );
 };
 
-// Stat Card Component
+// Stat Card Component - Smaller size, more spread out gradient
 const StatCard = ({
     label,
     value,
+    maxValue,
     subtext,
     progress,
     icon,
     trend,
+    color = "violet",
 }: {
     label: string;
     value: string;
+    maxValue?: number;
     subtext?: string;
     progress?: number;
     icon?: React.ReactNode;
     trend?: "up" | "down";
+    color?: "violet" | "blue" | "emerald" | "amber" | "rose";
 }) => {
+    const colorClasses = {
+        violet: "from-violet-500 to-indigo-500",
+        blue: "from-blue-500 to-cyan-500",
+        emerald: "from-emerald-500 to-teal-500",
+        amber: "from-amber-500 to-orange-500",
+        rose: "from-rose-500 to-pink-500",
+    };
+
+    const bgColorClasses = {
+        violet: "bg-violet-50",
+        blue: "bg-blue-50",
+        emerald: "bg-emerald-50",
+        amber: "bg-amber-50",
+        rose: "bg-rose-50",
+    };
+
+    const textColorClasses = {
+        violet: "text-violet-600",
+        blue: "text-blue-600",
+        emerald: "text-emerald-600",
+        amber: "text-amber-600",
+        rose: "text-rose-600",
+    };
+
+    const shadowClasses = {
+        violet: "shadow-md hover:shadow-violet-100/50",
+        blue: "shadow-md hover:shadow-blue-100/50",
+        emerald: "shadow-md hover:shadow-emerald-100/50",
+        amber: "shadow-md hover:shadow-amber-100/50",
+        rose: "shadow-md hover:shadow-rose-100/50",
+    };
+
     return (
         <motion.div
-            whileHover={{ y: -2 }}
-            className="group p-4 bg-slate-50/80 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200"
+            whileHover={{ y: -2, scale: 1.01 }}
+            className={`group relative overflow-hidden bg-white rounded-xl ${shadowClasses[color]} transition-all duration-300`}
         >
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    {label}
-                </span>
-                {icon && (
-                    <div className="text-slate-400 group-hover:text-violet-500 transition-colors">
-                        {icon}
+            {/* Spread out decorative gradient background - larger and more prominent */}
+            <div className={`absolute -top-8 -right-8 w-32 h-32 ${bgColorClasses[color]} rounded-full blur-2xl opacity-60 group-hover:opacity-80 transition-opacity duration-300`} />
+            <div className={`absolute -bottom-10 -left-10 w-28 h-28 ${bgColorClasses[color]} rounded-full blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-300`} />
+            
+            <div className="relative p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {label}
+                    </span>
+                    <div className={`p-1.5 rounded-lg ${bgColorClasses[color]} group-hover:scale-110 transition-transform duration-300`}>
+                        <div className={`${textColorClasses[color]}`}>
+                            {icon}
+                        </div>
                     </div>
+                </div>
+
+                {progress !== undefined ? (
+                    <>
+                        <div className="mb-0.5">
+                            <span className="text-xl font-bold text-slate-800">{value}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${progress}%` }}
+                                transition={{ duration: 0.8, delay: 0.2 }}
+                                className={`h-full bg-gradient-to-r ${colorClasses[color]} rounded-full`}
+                            />
+                        </div>
+                        {subtext && (
+                            <p className="text-[10px] text-slate-400 font-medium">{subtext}</p>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <div className="flex items-baseline gap-0.5 mb-1">
+                            <span className="text-2xl font-bold text-slate-800">{value}</span>
+                            {maxValue !== undefined && (
+                                <span className="text-xs text-slate-400 font-medium">/{maxValue}</span>
+                            )}
+                        </div>
+                        {trend ? (
+                            <div className="flex items-center gap-1">
+                                <span className={`text-[10px] font-bold ${trend === "up" ? "text-emerald-600" : "text-rose-600"}`}>
+                                    {trend === "up" ? "↑" : "↓"} {subtext}
+                                </span>
+                            </div>
+                        ) : (
+                            subtext && <p className="text-[10px] text-slate-400 font-medium">{subtext}</p>
+                        )}
+                    </>
                 )}
             </div>
-
-            {progress !== undefined ? (
-                <>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${progress}%` }}
-                            transition={{ duration: 0.8, delay: 0.2 }}
-                            className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full"
-                        />
-                    </div>
-                    <span className="text-xl font-bold text-slate-800">{value}</span>
-                </>
-            ) : (
-                <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-slate-800">{value}</span>
-                    {subtext && (
-                        <span className={cn(
-                            "text-xs font-semibold",
-                            trend === "up" ? "text-emerald-600" : "text-slate-400"
-                        )}>
-                            {subtext}
-                        </span>
-                    )}
-                </div>
-            )}
         </motion.div>
     );
 };
 
-// Skeleton Loader
+// Skeleton Loader - Updated for smaller cards
 const CourseOverviewSkeleton = () => (
-    <div className="bg-white rounded-2xl border border-slate-200/50 shadow-sm p-6 animate-pulse">
+    <div className="bg-white rounded-2xl shadow-lg p-6 animate-pulse">
         <div className="flex gap-4 mb-6">
             <div className="w-16 h-16 bg-slate-200 rounded-2xl" />
             <div className="flex-1">
@@ -248,16 +289,16 @@ const CourseOverviewSkeleton = () => (
         </div>
         <div className="grid grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-                <div key={i} className="p-4 bg-slate-50 rounded-xl">
-                    <div className="h-3 w-20 bg-slate-200 rounded mb-2" />
-                    <div className="h-7 w-16 bg-slate-200 rounded" />
+                <div key={i} className="p-3 bg-white rounded-xl shadow-md">
+                    <div className="h-2 w-16 bg-slate-200 rounded mb-2" />
+                    <div className="h-6 w-12 bg-slate-200 rounded" />
                 </div>
             ))}
         </div>
     </div>
 );
 
-// Helper function (if cn is not available)
+// Helper function
 const cn = (...classes: (string | false | undefined)[]) => {
     return classes.filter(Boolean).join(' ');
 };

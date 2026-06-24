@@ -188,7 +188,6 @@ export const TeacherLeaveTableRow = ({ leave, onViewDetail, onCancel }: TeacherL
               <span className={`${typeInfo.bg} ${typeInfo.color} px-3 py-1 rounded-lg text-xs font-bold uppercase`}>
                 {typeInfo.label}
               </span>
-              <span className="text-gray-400 text-xs font-mono">Mã đơn: #{leave.id}</span>
             </div>
             <div className={`${statusConfig.bg} ${statusConfig.text} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5`}>
               <StatusIcon size={14} />

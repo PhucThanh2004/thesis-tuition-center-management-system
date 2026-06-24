@@ -27,12 +27,20 @@ import {
   Trash2,
   Edit,
   Volume2,
-  Loader2
+  Loader2,
+  BarChart3,
+  Gauge,
+  Circle,
+  CircleCheck,
+  CircleX,
+  Wrench,
+  Ban
 } from 'lucide-react';
 import type { RoomListDTO, Device, DeviceUpdateDTO } from '../../utils/types/room';
 import { roomApi } from '../../utils/api/room.api';
 import RoomModal from '../../components/adminComponents/RoomModal';
 import { useOutletContext } from 'react-router-dom';
+import { FadeInWhenVisible } from '../../components/motion/FadeInWhenVisible';
 
 const RoomPage = () => {
   const [classrooms, setClassrooms] = useState<RoomListDTO[]>([]);
@@ -50,10 +58,47 @@ const RoomPage = () => {
     location: '',
     devices: []
   });
+  const [greeting, setGreeting] = useState("");
+  const [currentTime, setCurrentTime] = useState("");
 
   // Fetch rooms from API
   useEffect(() => {
     fetchRooms();
+  }, []);
+
+  // Get greeting and time
+  useEffect(() => {
+    const getGreetingByTime = () => {
+      const now = new Date();
+      const vietnamTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
+      const hour = vietnamTime.getHours();
+
+      if (hour >= 5 && hour < 10) return "Chào buổi sáng";
+      if (hour >= 10 && hour < 12) return "Chào buổi trưa";
+      if (hour >= 12 && hour < 14) return "Chào buổi chiều";
+      if (hour >= 14 && hour < 18) return "Chào buổi chiều tốt lành";
+      if (hour >= 18 && hour < 22) return "Chào buổi tối";
+      return "Chào buổi đêm";
+    };
+
+    const getCurrentVietnamTime = () => {
+      const now = new Date();
+      const vietnamTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
+      return vietnamTime.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    };
+
+    const updateGreetingAndTime = () => {
+      setGreeting(getGreetingByTime());
+      setCurrentTime(getCurrentVietnamTime());
+    };
+
+    updateGreetingAndTime();
+    const interval = setInterval(updateGreetingAndTime, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchRooms = async () => {
@@ -91,7 +136,6 @@ const RoomPage = () => {
             };
         case 'ACTIVE':
         default:
-            // Khi manualStatus là ACTIVE, xem xét status thực tế
             return {
                 occupied: room.status === 'ACTIVE',
                 available: room.status === 'DISABLED',
@@ -101,7 +145,6 @@ const RoomPage = () => {
     }
 };
 
-  // Helper function để map devices từ API
   const getDevices = (devices: Device[]) => {
     return {
       projector: devices.some(d => d.type === 'PROJECTOR'),
@@ -114,27 +157,22 @@ const RoomPage = () => {
 
   const stats = {
     totalRooms: classrooms.length,
-
     inUse: classrooms.filter(
       r =>
         r.manualStatus === 'ACTIVE' &&
         r.status === 'ACTIVE'
     ).length,
-
     empty: classrooms.filter(
       r =>
         r.manualStatus === 'ACTIVE' &&
         r.status === 'DISABLED'
     ).length,
-
     maintenance: classrooms.filter(
       r => r.manualStatus === 'MAINTENANCE'
     ).length,
-
     disabled: classrooms.filter(
       r => r.manualStatus === 'DISABLED'
     ).length,
-
     avgOccupancy:
       classrooms.length > 0
         ? Math.round(
@@ -192,19 +230,16 @@ const RoomPage = () => {
         label: "Trống",
         icon: CheckCircle,
       },
-
       maintenance: {
         color: "rose",
         label: "Bảo trì",
         icon: AlertCircle,
       },
-
       occupied: {
         color: "indigo",
         label: "Đang sử dụng",
         icon: Users,
       },
-
       disabled: {
         color: "gray",
         label: "Vô hiệu hóa",
@@ -234,8 +269,7 @@ const RoomPage = () => {
       setFormData({
         name: room.name,
         seatCapacity: room.seatCapacity,
-        manualStatus: room.manualStatus,  // Chỉ dùng manualStatus
-        // Không cần status riêng
+        manualStatus: room.manualStatus,
         location: (room as any).location || '',
         devices: room.devices || []
       });
@@ -252,29 +286,23 @@ const RoomPage = () => {
     setIsModalOpen(true);
   };
 
-  // Hàm xử lý đồng bộ devices
   const syncDevices = async (roomId: number, selectedDevices: Device[]) => {
     try {
-      // Lấy danh sách device hiện tại của phòng
       const currentDevicesResponse = await roomApi.getDevices(roomId);
       const currentDevices = currentDevicesResponse.data || [];
 
-      // Tìm devices cần xóa (có trong current nhưng không có trong selected)
       const devicesToDelete = currentDevices.filter(
         current => !selectedDevices.some(selected => selected.type === current.type)
       );
 
-      // Tìm devices cần thêm (có trong selected nhưng không có trong current)
       const devicesToAdd = selectedDevices.filter(
         selected => !currentDevices.some(current => current.type === selected.type)
       );
 
-      // Xóa devices
       for (const device of devicesToDelete) {
         await roomApi.deleteDevice(device.id);
       }
 
-      // Thêm devices mới
       for (const device of devicesToAdd) {
         await roomApi.addDevice(roomId, device.type);
       }
@@ -286,16 +314,13 @@ const RoomPage = () => {
     }
   };
 
-  // Helper function để tạo DeviceUpdateDTO
   const getDeviceUpdates = (currentDevices: Device[], newDevices: Device[]): DeviceUpdateDTO[] => {
     const updates: DeviceUpdateDTO[] = [];
 
-    // Tìm devices cần xóa
     const devicesToDelete = currentDevices.filter(
       current => !newDevices.some(newDevice => newDevice.type === current.type)
     );
 
-    // Tìm devices cần thêm
     const devicesToAdd = newDevices.filter(
       newDevice => !currentDevices.some(current => current.type === newDevice.type)
     );
@@ -319,9 +344,7 @@ const RoomPage = () => {
     return updates;
   };
 
-
   const handleSaveRoom = async () => {
-    // Validate
     if (!formData.name.trim()) {
       alert('Vui lòng điền tên phòng học');
       return;
@@ -334,26 +357,22 @@ const RoomPage = () => {
 
     setSaving(true);
     try {
-      // Chuẩn bị data cơ bản - CHỈ gửi manualStatus
       const roomData: any = {
         name: formData.name.trim(),
         seatCapacity: formData.seatCapacity,
-        manualStatus: formData.manualStatus  // Chỉ gửi manualStatus
+        manualStatus: formData.manualStatus
       };
 
       if (editingRoom) {
-        // Lấy danh sách devices hiện tại
         const currentDevicesResponse = await roomApi.getDevices(editingRoom.id);
         const currentDevices = currentDevicesResponse.data || [];
 
-        // Tạo device updates nếu có thay đổi
         const deviceUpdates = getDeviceUpdates(currentDevices, formData.devices);
 
         if (deviceUpdates.length > 0) {
           roomData.devices = deviceUpdates;
         }
 
-        // Gọi API update
         await roomApi.update(editingRoom.id, roomData);
 
         setAlert?.({
@@ -361,11 +380,9 @@ const RoomPage = () => {
           message: "Cập nhật phòng học thành công",
         });
       } else {
-        // THÊM MỚI
         const createResponse = await roomApi.create(roomData);
         const savedRoom = createResponse.data;
 
-        // Thêm devices cho phòng mới
         if (savedRoom && formData.devices.length > 0) {
           for (const device of formData.devices) {
             await roomApi.addDevice(savedRoom.id, device.type);
@@ -378,7 +395,6 @@ const RoomPage = () => {
         });
       }
 
-      // Refresh danh sách
       await fetchRooms();
       setIsModalOpen(false);
       setEditingRoom(null);
@@ -418,7 +434,6 @@ const RoomPage = () => {
     setFormData({ ...formData, [field]: value });
   };
 
-  // Hardcoded energy score (có thể thay bằng API thật sau)
   const getEnergyScore = (roomId: number) => {
     const scores: Record<number, number> = {
       1: 85,
@@ -456,117 +471,227 @@ const RoomPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/20 p-6 font-sans">
-      {/* Room Modal */}
-      <RoomModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveRoom}
-        editingRoom={editingRoom}
-        formData={formData}
-        onFormChange={handleInputChange}
-        saving={saving}
-      />
+    <main className="min-h-screen">
+      {/* Header Section với gradient và viền lượn sóng phía sau */}
+      <section className="relative overflow-visible pb-6 bg-white">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-200 via-indigo-300 to-cyan-200 opacity-30"></div>
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full blur-3xl opacity-40"></div>
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-gradient-to-r from-sky-300 to-transparent rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
 
-      <div className="max-w-7xl mx-auto">
+        {/* SVG Waves */}
+        <div className="absolute bottom-0 left-0 w-full pointer-events-none z-0">
+          <svg 
+            className="relative w-full h-auto" 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 1440 250"
+            preserveAspectRatio="none"
+          >
+            <path 
+              fill="#f3f5f7" 
+              fillOpacity="0.9" 
+              d="M0,256L48,240C96,224,192,192,288,186.7C384,181,480,203,576,208C672,213,768,203,864,186.7C960,171,1056,149,1152,138.7C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            ></path>
+          </svg>
+        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          {[
-            {
-              icon: Building2,
-              label: "Tổng số phòng",
-              value: stats.totalRooms,
-              color: "indigo",
-              trend: null
-            },
+        {/* Content */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 z-10">
+          <div className="relative overflow-hidden">
+            <div className="relative px-6 py-6 lg:px-8">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 px-3 py-1.5">
+                      <Sparkles size={14} className="text-indigo-500" />
+                      <span className="text-indigo-500 text-xs font-medium">Quản lý phòng học</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-full">
+                      <Clock size={14} className="text-gray-500" />
+                      <span className="text-gray-600 text-sm">{currentTime}</span>
+                    </div>
+                  </div>
 
-            {
-              icon: Users,
-              label: "Đang sử dụng",
-              value: stats.inUse,
-              color: "emerald",
-              trend: "+8%"
-            },
-
-            {
-              icon: DoorOpen,
-              label: "Phòng trống",
-              value: stats.empty,
-              color: "amber",
-              trend: "-2%"
-            },
-
-            {
-              icon: Activity,
-              label: "Bảo trì",
-              value: stats.maintenance,
-              color: "rose",
-              trend: "0%"
-            },
-
-            {
-              icon: AlertCircle,
-              label: "Vô hiệu hóa",
-              value: stats.disabled,
-              color: "gray",
-              trend: null
-            },
-
-            {
-              icon: BatteryCharging,
-              label: "Hiệu suất",
-              value: `${stats.avgOccupancy}%`,
-              color: "violet",
-              trend: "+12%"
-            },
-          ].map((stat, idx) => (
-            <div key={idx} className="group bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-white/50 hover:shadow-lg hover:bg-white transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div className={`p-2.5 rounded-xl bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100/50 group-hover:scale-105 transition-transform duration-200`}>
-                  <stat.icon className={`text-${stat.color}-500`} size={20} />
+                  <div>
+                    <h1 className="text-gray-900 text-3xl lg:text-4xl font-bold tracking-tight">
+                      {greeting}, <span className="bg-clip-text text-transparent gradient-text">Quản trị viên!</span>
+                    </h1>
+                    <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
+                      <span>Quản lý toàn bộ phòng học của trung tâm</span>
+                      <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                      <span className="flex items-center gap-1">
+                        <TrendingUp size={14} className="text-blue-500" />
+                        Tổng quan phòng học
+                      </span>
+                    </p>
+                  </div>
                 </div>
-                {stat.trend && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stat.trend.startsWith('+') ? 'bg-emerald-100 text-emerald-600' : stat.trend.startsWith('-') ? 'bg-rose-100 text-rose-600' : 'bg-gray-100 text-gray-600'}`}>
-                    {stat.trend}
-                  </span>
-                )}
-              </div>
-              <div className="mt-3">
-                <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-                <p className="text-xs text-gray-500 font-medium tracking-wide">{stat.label}</p>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Search Bar */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-3 justify-between">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo mã phòng, tên..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white/80 backdrop-blur-sm transition-all"
-            />
-          </div>
-          <div className="flex gap-2 bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-gray-200 w-fit">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <LayoutList size={18} />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <Grid3x3 size={18} />
-            </button>
-          </div>
+          <FadeInWhenVisible delay={0.1}>
+            {/* Stats Cards - Sử dụng màu cố định thay vì dynamic */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+              {/* Tổng số phòng */}
+              <div className="group relative bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm border border-white/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-indigo-50 group-hover:scale-105 transition-transform duration-200">
+                      <Building2 className="text-indigo-500" size={16} />
+                    </div>
+                    <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">Tổng</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight">{stats.totalRooms}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Phòng học</p>
+                </div>
+              </div>
+
+              {/* Đang sử dụng */}
+              <div className="group relative bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm border border-white/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-emerald-50 group-hover:scale-105 transition-transform duration-200">
+                      <Users className="text-emerald-500" size={16} />
+                    </div>
+                    <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      {stats.totalRooms > 0 ? Math.round((stats.inUse / stats.totalRooms) * 100) : 0}%
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight">{stats.inUse}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Đang sử dụng</p>
+                  <div className="mt-1.5 w-full h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${stats.totalRooms > 0 ? (stats.inUse / stats.totalRooms) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phòng trống */}
+              <div className="group relative bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm border border-white/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-amber-50 group-hover:scale-105 transition-transform duration-200">
+                      <DoorOpen className="text-amber-500" size={16} />
+                    </div>
+                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Trống</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight">{stats.empty}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Phòng trống</p>
+                  <div className="mt-1.5 w-full h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-amber-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${stats.totalRooms > 0 ? (stats.empty / stats.totalRooms) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bảo trì */}
+              <div className="group relative bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm border border-white/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-rose-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-rose-50 group-hover:scale-105 transition-transform duration-200">
+                      <Wrench className="text-rose-500" size={16} />
+                    </div>
+                    <span className="text-[10px] font-medium text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">Bảo trì</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight">{stats.maintenance}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Đang bảo trì</p>
+                  <div className="mt-1.5 w-full h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-rose-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${stats.totalRooms > 0 ? (stats.maintenance / stats.totalRooms) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vô hiệu hóa */}
+              <div className="group relative bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm border border-white/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gray-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="p-1.5 rounded-lg bg-gray-100 group-hover:scale-105 transition-transform duration-200">
+                      <Ban className="text-gray-500" size={16} />
+                    </div>
+                    <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">Vô hiệu</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-800 tracking-tight">{stats.disabled}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Vô hiệu hóa</p>
+                  <div className="mt-1.5 w-full h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gray-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${stats.totalRooms > 0 ? (stats.disabled / stats.totalRooms) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </FadeInWhenVisible>
         </div>
+      </section>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        {/* Room Modal */}
+        <RoomModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSaveRoom}
+          editingRoom={editingRoom}
+          formData={formData}
+          onFormChange={handleInputChange}
+          saving={saving}
+        />
+
+    {/* Search Bar - Phiên bản nhỏ gọn và đẹp hơn */}
+<div className="mb-6 flex flex-col sm:flex-row gap-3 justify-between items-center">
+  <div className="relative flex-1 max-w-md group">
+    <Search 
+      className={`absolute left-3.5 top-1/2 transform -translate-y-1/2 transition-colors duration-200 ${
+        searchQuery ? 'text-indigo-500' : 'text-gray-400 group-hover:text-gray-500'
+      }`} 
+      size={16} 
+    />
+    <input
+      type="text"
+      placeholder="Tìm kiếm phòng học..."
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white/80 backdrop-blur-sm transition-all placeholder:text-gray-400 hover:border-gray-300"
+    />
+    {searchQuery && (
+      <button
+        onClick={() => setSearchQuery('')}
+        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors hover:scale-110"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    )}
+  </div>
+  <div className="flex gap-2 bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-gray-200 w-fit shadow-sm">
+    <button
+      onClick={() => setViewMode('table')}
+      className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+    >
+      <LayoutList size={16} />
+    </button>
+    <button
+      onClick={() => setViewMode('grid')}
+      className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+    >
+      <Grid3x3 size={16} />
+    </button>
+  </div>
+</div>
 
         {/* Dynamic View: Table or Grid */}
         {viewMode === 'table' ? (
@@ -612,15 +737,12 @@ const RoomPage = () => {
                             {status.available && (
                               <StatusBadge type="available" value />
                             )}
-
                             {status.maintenance && (
                               <StatusBadge type="maintenance" value />
                             )}
-
                             {status.occupied && (
                               <StatusBadge type="occupied" value />
                             )}
-
                             {status.disabled && (
                               <StatusBadge type="disabled" value />
                             )}
@@ -691,15 +813,12 @@ const RoomPage = () => {
                         {status.available && (
                           <StatusBadge type="available" value />
                         )}
-
                         {status.occupied && (
                           <StatusBadge type="occupied" value />
                         )}
-
                         {status.maintenance && (
                           <StatusBadge type="maintenance" value />
                         )}
-
                         {status.disabled && (
                           <StatusBadge type="disabled" value />
                         )}
@@ -739,7 +858,7 @@ const RoomPage = () => {
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1 text-xs">
                         <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full bg-gradient-to-r ${energyScore >= 80 ? 'from-emerald-400 to-emerald-500' : energyScore >= 60 ? 'from-amber-400 to-amber-500' : 'from-rose-400 to-rose-500'}`} style={{ width: `${energyScore}%` }}></div>
+                          <div className={`h-full rounded-full ${energyScore >= 80 ? 'bg-emerald-500' : energyScore >= 60 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${energyScore}%` }}></div>
                         </div>
                         <span className="text-gray-500">HS {energyScore}%</span>
                       </div>
@@ -803,21 +922,17 @@ const RoomPage = () => {
           </div>
         </div>
       </div>
+
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => handleOpenModal()}
           className="relative group w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 text-white shadow-2xl shadow-indigo-500/30 dark:shadow-indigo-600/40 backdrop-blur-sm overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 transition-all duration-300 hover:scale-105 active:scale-95"
         >
-          {/* Glow */}
           <div
             className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-md"
           />
-
-          {/* Pulse Ring */}
           <span className="absolute inset-0 rounded-full border-2 border-indigo-400/60 animate-ping" />
-
-          {/* Icon */}
           <Plus
             size={26}
             strokeWidth={2}
@@ -825,7 +940,7 @@ const RoomPage = () => {
           />
         </button>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -42,7 +42,6 @@ export const teacherSubjectApi = {
     async update(id: number, data: Partial<TeacherSubjectRequest>): Promise<ApiResponse> {
         const response = await axios.put(`/teacher-subjects/${id}`, data);
         const result = (response as any).data ?? response;
-        console.log('Update result:', result);
         return result;
     },
 

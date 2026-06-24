@@ -1,6 +1,7 @@
+// src/app/pages/admin/leaves/LeaveManagementPage.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { LeaveHeader } from '../../../components/adminComponents/leaves/LeaveHeader';
@@ -11,7 +12,14 @@ import { QuickActions } from '../../../components/adminComponents/leaves/QuickAc
 import { RecentActivities } from '../../../components/adminComponents/leaves/RecentActivities';
 import { ProfileCard } from '../../../components/adminComponents/leaves/ProfileCard';
 import { teacherLeaveApi } from '../../../utils/api/teacherLeave.api';
-import type { TeacherLeave, TeacherLeaveApproveRequest } from '../../../utils/types/teacherLeave';
+import { teacherApi } from '../../../utils/api/teacher.api';
+import type {
+  TeacherLeave,
+  TeacherLeaveApproveRequest,
+  ReplacementWithSalary,
+  PreviewAffectedSessionResponse
+} from '../../../utils/types/teacherLeave';
+import type { Teacher } from '../../../utils/types/teacher';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { LeaveApprovalModal } from '../../../components/adminComponents/leaves/LeaveApprovalModal';
 
@@ -27,27 +35,27 @@ const containerVariants: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
     },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: "easeOut" },
+    transition: { duration: 0.3, ease: "easeOut" },
   },
 };
 
 const slideInRight: Variants = {
-  hidden: { opacity: 0, x: 50 },
+  hidden: { opacity: 0, x: 30 },
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.4, ease: "easeOut", delay: 0.3 },
+    transition: { duration: 0.3, ease: "easeOut", delay: 0.1 },
   },
 };
 
@@ -56,6 +64,16 @@ const spinTransition = {
   duration: 1,
   ease: "linear" as const,
 };
+
+// ✅ Định nghĩa kiểu cho cache
+interface TeacherCacheInfo {
+  name: string;
+  avatar?: string;
+  email?: string;
+}
+
+// ✅ Cache cho thông tin giáo viên với kiểu rõ ràng
+const teacherCache = new Map<number, TeacherCacheInfo>();
 
 export function LeaveManagementPage() {
   const { setAlert } = useOutletContext<any>();
@@ -70,10 +88,13 @@ export function LeaveManagementPage() {
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<TeacherLeave | null>(null);
   const navigate = useNavigate();
-  const [affectedSessions, setAffectedSessions] = useState<any[]>([]);
+  const [affectedSessions, setAffectedSessions] = useState<PreviewAffectedSessionResponse[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  
+  const isFetchingRef = useRef(false);
+  const initialFetchDoneRef = useRef(false);
 
   // Constants mapping
   const statusMap: Record<string, string> = {
@@ -82,7 +103,7 @@ export function LeaveManagementPage() {
     REJECTED: 'Từ chối',
     CANCELLED: 'Đã hủy'
   };
-  
+
   const reverseStatusMap: Record<string, string> = {
     'Tất cả': '',
     'Chờ duyệt': 'PENDING',
@@ -98,7 +119,7 @@ export function LeaveManagementPage() {
     PERSONAL: 'Việc riêng',
     OTHER: 'Khác'
   };
-  
+
   const reverseLeaveTypeMap: Record<string, string> = {
     'Tất cả': '',
     'Nghỉ ốm': 'SICK',
@@ -108,80 +129,164 @@ export function LeaveManagementPage() {
     'Khác': 'OTHER'
   };
 
-  // ✅ FIX: fetchLeaves - GỬI dateRange lên BE, KHÔNG filter frontend
-  const fetchLeaves = useCallback(async (page: number = 1, pageSize: number = 10) => {
-    setLoading(true);
-    try {
-      // Build params để gửi lên BE
-      const params: any = { page, size: pageSize };
+  const getTeacherInfo = useCallback(async (userId: number): Promise<TeacherCacheInfo> => {
+  const cached = teacherCache.get(userId);
+  if (cached) {
+    console.log(`📦 Cache hit for userId ${userId}:`, cached.avatar ? 'has avatar' : 'no avatar');
+    return cached;
+  }
+
+  try {
+    // ✅ Dùng teacherApi.getAll() giống TeacherManagementPage
+    console.log(`🔍 Fetching teacher info for userId ${userId}...`);
+    const response = await teacherApi.getAll(1, 1000);
+    
+    console.log(`📥 getAll response:`, {
+      success: response.success,
+      dataCount: response.data?.length || 0,
+      sampleTeachers: response.data?.slice(0, 3).map((t: Teacher) => ({
+        id: t.id,
+        name: t.fullName,
+        image: t.image,
+        hasImage: !!t.image
+      }))
+    });
+    
+    if (response.success && response.data) {
+      // Tìm teacher theo userId (id trong response là userId)
+      const teacher = response.data.find((t: Teacher) => t.id === userId);
       
-      // Filter theo status (nếu có)
+      if (teacher) {
+        console.log(`✅ Found teacher for userId ${userId}:`, {
+          id: teacher.id,
+          name: teacher.fullName,
+          image: teacher.image,
+          hasImage: !!teacher.image
+        });
+        
+        const info: TeacherCacheInfo = {
+          name: teacher.fullName || `GV${userId}`,
+          avatar: teacher.image || undefined,
+          email: teacher.email
+        };
+        teacherCache.set(userId, info);
+        return info;
+      }
+    }
+    
+    // Fallback nếu không tìm thấy
+    console.log(`⚠️ No teacher found for userId ${userId}`);
+    const fallback: TeacherCacheInfo = { 
+      name: `GV${userId}`, 
+      avatar: undefined,
+      email: undefined 
+    };
+    teacherCache.set(userId, fallback);
+    return fallback;
+    
+  } catch (error) {
+    console.error(`❌ Failed to fetch teacher for userId ${userId}:`, error);
+    const fallback: TeacherCacheInfo = { 
+      name: `GV${userId}`, 
+      avatar: undefined,
+      email: undefined 
+    };
+    teacherCache.set(userId, fallback);
+    return fallback;
+  }
+}, []);
+  // fetchLeaves - Cập nhật để lấy avatar
+  const fetchLeaves = useCallback(async (page: number = 1, pageSize: number = 10) => {
+    if (isFetchingRef.current) {
+      console.log('⏭️ Skipping duplicate fetch');
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    setLoading(true);
+    
+    try {
+      const params: any = { page, size: pageSize };
+
       if (selectedStatus && selectedStatus !== 'Tất cả') {
         params.status = reverseStatusMap[selectedStatus];
       }
-      
-      // Filter theo leave type (nếu có)
+
       if (selectedLeaveType && selectedLeaveType !== 'Tất cả') {
         const apiLeaveType = reverseLeaveTypeMap[selectedLeaveType];
         if (apiLeaveType) {
           params.leaveType = apiLeaveType;
         }
       }
-      
-      // ✅ QUAN TRỌNG: Gửi dateRange lên BE
+
       if (dateRange.from) {
         params.startDate = dateRange.from;
       }
       if (dateRange.to) {
         params.endDate = dateRange.to;
       }
-      
-      // Log để debug
+
       console.log('📤 Fetching leaves with params:', params);
-      
-      // Gọi API
+
       const { data, pagination: pag } = await teacherLeaveApi.getAll(params);
-      
+
       console.log('📥 Received from API:', {
         totalItems: pag.totalItems,
         currentPage: pag.currentPage,
         dataCount: data.length
       });
-      
-      // ✅ KHÔNG filter frontend nữa - dữ liệu đã được lọc từ BE
-      let filteredData = [...data];
-      
-      // CHỈ filter search ở frontend (vì BE không có search)
+
+      // ✅ Enrich dữ liệu với avatar từ teacher API
+      const enrichedData = await Promise.all(
+        data.map(async (leave) => {
+          const teacherInfo = await getTeacherInfo(leave.teacherId);
+          return {
+            ...leave,
+            teacherAvatar: teacherInfo.avatar,
+            teacherEmail: teacherInfo.email || leave.teacherEmail
+          };
+        })
+      );
+
+      console.log('✅ Enriched data:', enrichedData.map(l => ({
+        id: l.id,
+        teacherName: l.teacherName,
+        teacherId: l.teacherId,
+        hasAvatar: !!l.teacherAvatar,
+        avatar: l.teacherAvatar
+      })));
+
+      let filteredData = [...enrichedData];
+
       if (searchQuery) {
         filteredData = filteredData.filter(l =>
           l.teacherName?.toLowerCase().includes(searchQuery.toLowerCase())
         );
       }
-      
+
       setLeaves(filteredData);
-      
-      // ✅ Cập nhật pagination đúng từ BE
-      // Lưu ý: totalItems là từ BE, nhưng nếu có search frontend thì totalItems sẽ sai
-      // Giải pháp: Nếu có search, tính lại totalItems từ filteredData
+
       const finalTotalItems = searchQuery ? filteredData.length : pag.totalItems;
-      
+
       setPagination({
         currentPage: pag.currentPage,
         totalPages: pag.totalPages,
         totalItems: finalTotalItems,
         pageSize,
       });
-      
+
+      initialFetchDoneRef.current = true;
+
     } catch (error: any) {
       console.error('❌ Fetch error:', error);
       setAlert?.({ type: 'error', message: error.message || 'Không thể tải dữ liệu' });
       setLeaves([]);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [searchQuery, selectedStatus, selectedLeaveType, dateRange, setAlert, reverseStatusMap, reverseLeaveTypeMap]);
+  }, [searchQuery, selectedStatus, selectedLeaveType, dateRange, setAlert, getTeacherInfo]);
 
-  // Hàm xóa tất cả filters
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedStatus('Tất cả');
@@ -189,11 +294,9 @@ export function LeaveManagementPage() {
     setDateRange({ from: '', to: '' });
   };
 
-  // ✅ useEffect chỉ fetch khi filters thay đổi
   useEffect(() => {
-    // Reset về page 1 khi filter thay đổi
     fetchLeaves(1, pagination.pageSize);
-  }, [searchQuery, selectedStatus, selectedLeaveType, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedStatus, selectedLeaveType, dateRange]);
 
   const handlePageChange = (page: number) => {
     fetchLeaves(page, pagination.pageSize);
@@ -206,14 +309,17 @@ export function LeaveManagementPage() {
       const sessions = leave.affectedSessions || [];
 
       setSelectedLeave(leave);
-      const mappedSessions = sessions.map((s: any) => ({
-        id: s.sessionId,
+      const mappedSessions: PreviewAffectedSessionResponse[] = sessions.map((s: any) => ({
         sessionId: s.sessionId,
         sessionDate: s.sessionDate,
         startTime: s.startTime,
         endTime: s.endTime,
         subjectName: s.subjectName,
         subjectId: s.subjectId,
+        className: s.className,
+        roomName: s.roomName,
+        replacementTeacherId: s.replacementTeacherId,
+        replacementTeacherName: s.replacementTeacherName,
       }));
       setAffectedSessions(mappedSessions);
       setApprovalModalOpen(true);
@@ -240,11 +346,19 @@ export function LeaveManagementPage() {
 
   const handleApprovalSubmit = async (options: {
     approvalType: 'full_leave' | 'flexible';
-    replacements: Record<string, string>;
+    replacements: ReplacementWithSalary[];
     cancelledSessions: string[];
     comment: string;
   }) => {
     if (!selectedLeave) return;
+
+    console.log('🔍 [LeaveManagementPage] Received from modal:', {
+      approvalType: options.approvalType,
+      replacements: options.replacements,
+      cancelledSessions: options.cancelledSessions,
+      comment: options.comment
+    });
+
     setIsSubmitting(true);
 
     try {
@@ -275,19 +389,16 @@ export function LeaveManagementPage() {
         }
       }
 
-      let replacementsArray: { sessionId: number; replacementTeacherId: number }[] | undefined = undefined;
+      let replacementsArray: ReplacementWithSalary[] | undefined = undefined;
 
-      if (options.approvalType === 'flexible') {
-        const replacementsList = Object.entries(options.replacements)
-          .filter(([, teacherId]) => teacherId && teacherId !== '')
-          .map(([sessionId, teacherId]) => ({
-            sessionId: Number(sessionId),
-            replacementTeacherId: Number(teacherId),
+      if (options.approvalType === 'flexible' && options.replacements.length > 0) {
+        replacementsArray = options.replacements
+          .filter(r => r.replacementTeacherId && r.replacementTeacherId > 0)
+          .map(r => ({
+            sessionId: r.sessionId,
+            replacementTeacherId: r.replacementTeacherId,
+            salary: r.salary || undefined,
           }));
-
-        if (replacementsList.length > 0) {
-          replacementsArray = replacementsList;
-        }
       }
 
       let affectType: 'CANCEL' | 'REPLACE' = 'CANCEL';
@@ -362,12 +473,12 @@ export function LeaveManagementPage() {
     navigate(`/admin/teacher/leave/${id}`);
   };
 
-  // ✅ Tính stats dựa trên leaves hiện tại (đã được filter từ BE)
+  // Tính stats
   const totalLeaves = leaves.length;
   const pendingCount = leaves.filter(l => l.status === 'PENDING').length;
   const approvedCount = leaves.filter(l => l.status === 'APPROVED').length;
   const rejectedCount = leaves.filter(l => l.status === 'REJECTED').length;
-  
+
   const leaveStatsData: LeaveStatItem[] = [
     { title: 'Tổng đơn', value: totalLeaves, icon: 'dashboard' },
     { title: 'Chờ duyệt', value: pendingCount, icon: 'pending_actions' },
@@ -375,36 +486,47 @@ export function LeaveManagementPage() {
     { title: 'Từ chối', value: rejectedCount, icon: 'cancel' }
   ];
 
-  const tableLeaves = leaves.map(leave => ({
-    id: leave.id.toString(),
-    teacherName: leave.teacherName,
-    teacherCode: `GV${leave.teacherId}`,
-    leaveType: (leaveTypeMap[leave.leaveType] || leave.leaveType) as any,
-    startDate: leave.startDate,
-    endDate: leave.endDate,
-    days: Math.ceil((new Date(leave.endDate).getTime() - new Date(leave.startDate).getTime()) / (1000 * 3600 * 24)) + 1,
-    status: (statusMap[leave.status] || leave.status) as any,
-    avatar: undefined,
-    department: leave.teacherEmail,
-    teacherId: leave.teacherId.toString(),
-    createdAt: leave.createdAt,
-    description: leave.reason || ''
-  }));
+  // ✅ Transform data với avatar từ enriched data
+  const tableLeaves = leaves.map(leave => {
+    return {
+      id: leave.id.toString(),
+      teacherName: leave.teacherName,
+      teacherCode: `GV${leave.teacherId}`,
+      leaveType: (leaveTypeMap[leave.leaveType] || leave.leaveType) as any,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: Math.ceil((new Date(leave.endDate).getTime() - new Date(leave.startDate).getTime()) / (1000 * 3600 * 24)) + 1,
+      status: (statusMap[leave.status] || leave.status) as any,
+      avatar: (leave as any).teacherAvatar,
+      department: leave.teacherEmail,
+      teacherId: leave.teacherId.toString(),
+      createdAt: leave.createdAt,
+      description: leave.reason || ''
+    };
+  });
+
+  // ✅ Log để debug
+  console.log('📊 Final tableLeaves:', tableLeaves.map(l => ({
+    id: l.id,
+    teacherName: l.teacherName,
+    hasAvatar: !!l.avatar,
+    avatar: l.avatar
+  })));
 
   if (modalLoading) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center bg-slate-50"
       >
         <div className="text-center">
           <motion.div
             animate={{ rotate: 360 }}
             transition={spinTransition}
-            className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full mx-auto"
+            className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"
           />
-          <p className="mt-4 text-gray-500">Đang tải dữ liệu đơn nghỉ...</p>
+          <p className="mt-3 text-xs text-slate-400">Đang tải dữ liệu đơn nghỉ...</p>
         </div>
       </motion.div>
     );
@@ -415,70 +537,83 @@ export function LeaveManagementPage() {
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"
+      className="min-h-screen bg-slate-50 flex"
     >
-      <div className="flex">
-        <motion.main
-          variants={itemVariants}
-          className="flex-1 overflow-y-auto px-8 py-10 space-y-8"
+      <motion.main
+        variants={itemVariants}
+        className="flex-1 flex flex-col min-h-screen px-6 py-6 space-y-5"
+      >
+        <motion.div variants={itemVariants}>
+          <LeaveHeader onCreateRequest={handleCreateRequest} />
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <LeaveStats stats={leaveStatsData} />
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <LeaveToolbar
+            searchQuery={searchQuery}
+            onSearchChange={(e) => setSearchQuery(e.target.value)}
+            selectedStatus={selectedStatus}
+            onStatusChange={setSelectedStatus}
+            selectedLeaveType={selectedLeaveType}
+            onLeaveTypeChange={setSelectedLeaveType}
+            onClearFilters={handleClearFilters}
+            onViewModeChange={setCurrentViewMode}
+            currentViewMode={currentViewMode}
+            statusOptions={['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Từ chối', 'Đã hủy']}
+            leaveTypeOptions={['Tất cả', 'Nghỉ phép năm', 'Nghỉ ốm', 'Việc riêng', 'Nghỉ không lương', 'Khác']}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
+        </motion.div>
+
+        <motion.div 
+          variants={itemVariants} 
+          className="flex-1 flex flex-col min-h-0"
         >
-          <motion.div variants={itemVariants}>
-            <LeaveHeader onCreateRequest={handleCreateRequest} />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <LeaveStats stats={leaveStatsData} />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <LeaveToolbar
-              searchQuery={searchQuery}
-              onSearchChange={(e) => setSearchQuery(e.target.value)}
-              selectedStatus={selectedStatus}
-              onStatusChange={setSelectedStatus}
-              selectedLeaveType={selectedLeaveType}
-              onLeaveTypeChange={setSelectedLeaveType}
-              onClearFilters={handleClearFilters}
-              onViewModeChange={setCurrentViewMode}
-              currentViewMode={currentViewMode}
-              statusOptions={['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Từ chối', 'Đã hủy']}
-              leaveTypeOptions={['Tất cả', 'Nghỉ phép năm', 'Nghỉ ốm', 'Việc riêng', 'Nghỉ không lương', 'Khác']}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-center py-20"
-                >
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200"
+              >
+                <div className="text-center">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={spinTransition}
-                    className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full mx-auto"
+                    className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"
                   />
-                  <p className="mt-4 text-gray-500">Đang tải dữ liệu...</p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="table"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {tableLeaves.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-2xl">
-                      <p className="text-gray-500">Không có dữ liệu đơn nghỉ</p>
+                  <p className="mt-3 text-xs text-slate-400">Đang tải dữ liệu...</p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="table"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                {tableLeaves.length === 0 ? (
+                  <div className="flex-1 bg-white rounded-xl border border-slate-200 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                        <svg className="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium text-slate-600">Không có dữ liệu đơn nghỉ</p>
                     </div>
-                  ) : (
-                    <>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-h-0">
                       <LeaveTable
                         leaves={tableLeaves}
                         selectedIds={selectedIds.map(String)}
@@ -495,59 +630,67 @@ export function LeaveManagementPage() {
                         onReject={(id) => handleReject(parseInt(id))}
                         onViewDetail={(id) => handleViewDetail(Number(id))}
                       />
+                    </div>
 
-                      {pagination.totalPages > 1 && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3, delay: 0.3 }}
-                          className="flex justify-center gap-2 mt-6"
+                    {pagination.totalPages > 1 && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3, delay: 0.2 }}
+                        className="flex justify-center gap-2 mt-4 pb-1"
+                      >
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handlePageChange(pagination.currentPage - 1)}
+                          disabled={pagination.currentPage === 1}
+                          className="px-4 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handlePageChange(pagination.currentPage - 1)}
-                            disabled={pagination.currentPage === 1}
-                            className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          >
-                            ← Trước
-                          </motion.button>
-                          <motion.span
-                            key={pagination.currentPage}
-                            initial={{ scale: 0.8 }}
-                            animate={{ scale: 1 }}
-                            className="px-4 py-2 text-gray-600 font-medium"
-                          >
-                            {pagination.currentPage} / {pagination.totalPages}
-                          </motion.span>
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handlePageChange(pagination.currentPage + 1)}
-                            disabled={pagination.currentPage === pagination.totalPages}
-                            className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          >
-                            Sau →
-                          </motion.button>
-                        </motion.div>
-                      )}
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </motion.main>
+                          ← Trước
+                        </motion.button>
+                        <motion.span
+                          key={pagination.currentPage}
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                          className="px-4 py-1.5 text-xs text-slate-600 font-medium"
+                        >
+                          {pagination.currentPage} / {pagination.totalPages}
+                        </motion.span>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handlePageChange(pagination.currentPage + 1)}
+                          disabled={pagination.currentPage === pagination.totalPages}
+                          className="px-4 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          Sau →
+                        </motion.button>
+                      </motion.div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </motion.main>
 
-        <motion.aside
-          variants={slideInRight}
-          className="w-80 bg-white border-l border-gray-200 p-6 space-y-6 hidden lg:block overflow-y-auto"
-        >
+      <motion.aside
+        variants={slideInRight}
+        className="w-72 bg-white border-l border-slate-200 flex flex-col h-screen sticky top-0 overflow-y-auto"
+      >
+        <div className="p-5 space-y-5 flex-1">
           <QuickActions onQuickCreate={handleCreateRequest} onExport={handleExport} />
-          <RecentActivities activities={[]} onViewAll={() => { }} />
-          <ProfileCard userName="Admin Dashboard" userRole="Quản trị viên cấp cao" onLogout={() => { }} />
-        </motion.aside>
-      </div>
+          <RecentActivities activities={[]} onViewAll={() => {}} />
+        </div>
+        <div className="p-5 border-t border-slate-200">
+          <ProfileCard 
+            userName="Admin Dashboard" 
+            userRole="Quản trị viên" 
+            onLogout={() => {}} 
+          />
+        </div>
+      </motion.aside>
 
       <LeaveApprovalModal
         isOpen={approvalModalOpen}

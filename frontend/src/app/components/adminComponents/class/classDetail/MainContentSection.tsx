@@ -11,14 +11,30 @@ type Props = {
     subject: Subject | null;
     onRefreshSubject?: () => void;
     isTeacher?: boolean;
+    onTabChange?: (tabIndex: number) => void;
 };
 
-export const MainContentSection = ({ activeTab, subject, onRefreshSubject, isTeacher }: Props) => {
+export const MainContentSection = ({ activeTab, subject, onRefreshSubject, isTeacher, onTabChange }: Props) => {
 
+    const handleNavigateToMaterials = () => {
+        if (onTabChange) {
+            onTabChange(4);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const handleNavigateToAttendance = () => {
+        if (onTabChange) {
+            onTabChange(5);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
     const renderContent = () => {
         switch (activeTab) {
             case 0:
-                return <ClassDetailContent subject={subject} isTeacher={isTeacher} />;
+                return <ClassDetailContent subject={subject} isTeacher={isTeacher}
+                    onNavigateToMaterials={handleNavigateToMaterials}
+                    onNavigateToAttendance={handleNavigateToAttendance} />;
 
             case 1:
                 return <StudentTableSection subject={subject} isTeacher={isTeacher} />;

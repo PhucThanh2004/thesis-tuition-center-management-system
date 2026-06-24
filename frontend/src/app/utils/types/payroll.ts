@@ -6,11 +6,12 @@ export type AssignmentType = 'MAIN' | 'REPLACEMENT';
 export type SalaryType = 'PER_SESSION' | 'PER_HOUR' | 'PER_MONTH';
 
 export type TeacherPaymentStatus =
-  | 'DRAFT'                              // Bản nháp
-  | 'WAITING_TEACHER_CONFIRMATION'       // Chờ giáo viên xác nhận
-  | 'TEACHER_CONFIRMED'                  // Giáo viên đã xác nhận
-  | 'FINALIZED'                          // Đã chốt
-  | 'PAID';                              // Đã thanh toán
+  | 'WAITING_TEACHER_CONFIRMATION'
+  | 'TEACHER_CONFIRMED'
+  | 'REJECTED'
+  | 'REQUEST_ADJUSTMENT'
+  | 'FINALIZED'
+  | 'PAID'
 
 // ========== Response Types từ API ==========
 export interface PayrollPreviewResponse {
@@ -32,7 +33,11 @@ export interface PayrollDetailResponse {
   amount: number;
   totalSessions: number;
   status: TeacherPaymentStatus;
-  paymentDate: string; // LocalDate
+  paymentDate: string;
+  revisionNo?: number;
+  previousAmount?: number;
+  lastAdjustmentReason?: string;
+  adjustedAt?: string;
   details: PayrollSessionDetail[];
 }
 
@@ -47,21 +52,24 @@ export interface TeacherPayment {
   amount: number;
   paidAmount: number;
   totalSessions: number;
-  paymentDate: string; // LocalDate
+  paymentDate: string;
   month: number;
   year: number;
   status: TeacherPaymentStatus;
   notes?: string;
   payrollNote?: string;
   teacherFeedback?: string;
-  teacherConfirmedAt?: string; // LocalDateTime
+  teacherConfirmedAt?: string;
   teacherConfirmedBy?: number;
-  finalizedAt?: string; // LocalDateTime
+  finalizedAt?: string;
   finalizedBy?: number;
-  createdAt: string; // LocalDateTime
-  updatedAt: string; // LocalDateTime
+  createdAt: string;
+  updatedAt: string;
+  revisionNo?: number;
+  previousAmount?: number;
+  lastAdjustmentReason?: string;
+  adjustedAt?: string;
 }
-
 export interface TeacherPaymentDetail {
   id: number;
   paymentInfo: TeacherPayment;
@@ -152,6 +160,7 @@ export interface PayrollStats {
   draftCount: number;
   waitingConfirmationCount: number;
   confirmedCount: number;
+  rejectedCount?: number;
   finalizedCount: number;
   paidCount: number;
   completionRate: number;    // ✅ Thêm dòng này
@@ -242,6 +251,7 @@ export interface PayrollListItem {
   totalSessions: number;
   status: TeacherPaymentStatus;
   paymentDate: string;
+  revisionNo?: number;
 }
 
 export interface MonthlyPayrollTeacherDTO {
@@ -257,14 +267,19 @@ export interface MonthlyPayrollPreview {
   teachers: MonthlyPayrollTeacherDTO[];
   totalTeachers: number;
   totalPayrollAmount: number;
+  totalAmount: number;
+  payrolls: TeacherPayrollSummary[];
 }
 
 export interface MonthlyPayrollStats {
   month: number;
   year: number;
-  teacherCount: number;
-  sessionCount: number;
+  totalPayrolls: number;
   totalAmount: number;
+  statusCounts: Record<string, number>;
+  averageAmount: number;
+  minAmount: number;
+  maxAmount: number;
 }
 
 export interface TeacherPayrollSummary {
@@ -274,7 +289,6 @@ export interface TeacherPayrollSummary {
   amount: number;
   totalSessions: number;
   status: TeacherPaymentStatus;
-  teacherName?: string;
 }
 
 // Cập nhật PayrollStats
@@ -285,7 +299,34 @@ export interface PayrollStats {
   draftCount: number;
   waitingConfirmationCount: number;
   confirmedCount: number;
+  rejectedCount?: number;
   finalizedCount: number;
   paidCount: number;
   completionRate: number;
+}
+export interface TeacherPayrollRejectRequest {
+  paymentId: number;
+  reason: string;
+}
+
+export interface PayrollFinalizeRequest {
+  paymentId: number;
+  payrollNote?: string;
+}
+
+// *** THÊM MỚI: Request điều chỉnh (nếu có) ***
+export interface TeacherPayrollAdjustmentRequest {
+  paymentId: number;
+  adjustmentReason: string;
+}
+
+export interface TeacherPaymentResponse {
+  id: number;
+  teacherId: number;
+  teacherName: string;
+  month: number;
+  year: number;
+  amount: number;
+  status: string;
+  revisionNo: number;
 }

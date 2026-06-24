@@ -1,11 +1,13 @@
-// src/app/teachers/page.tsx (corrected)
+// src/app/teachers/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Download, Search, Users, TrendingUp, Shield, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import TeacherStats from '../../../components/adminComponents/teachers/TeacherStats';
-import type { TeacherStat }  from '../../../components/adminComponents/teachers/TeacherStats';
+import type { TeacherStat } from '../../../components/adminComponents/teachers/TeacherStats';
 import TeacherToolbar from '../../../components/adminComponents/teachers/TeacherToolbar';
 import TeacherTable from '../../../components/adminComponents/teachers/TeacherTable';
 import QuickActions from '../../../components/adminComponents/teachers/QuickActions';
@@ -31,25 +33,77 @@ export function TeacherManagementPage() {
     pageSize: 10,
   });
   const [filters, setFilters] = useState<TeacherFilterParams>({});
-  
-  // Stats from API (totals, new this month, percentage)
+
+  // Stats from API (totals, new this month, percentage) - KHÔNG BỊ ẢNH HƯỞNG BỞI FILTER
   const [apiStats, setApiStats] = useState({
     totalTeachers: 0,
     newThisMonth: 0,
     percentageIncrease: 0,
   });
-  
-  // Derived stats from teachers list
-  const [derivedStats, setDerivedStats] = useState({
+
+  // Derived stats from ALL teachers - KHÔNG BỊ ẢNH HƯỞNG BỞI FILTER
+  const [allTeachersStats, setAllTeachersStats] = useState({
     active: 0,
     inactive: 0,
     male: 0,
     female: 0,
   });
-  
+
   const navigate = useNavigate();
 
-  // Fetch teachers
+  // Animation variants
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const headerVariants: Variants = {
+    hidden: { y: -50, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring" as const,
+        stiffness: 100,
+        damping: 12,
+      },
+    },
+  };
+
+  const contentVariants: Variants = {
+    hidden: { y: 30, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring" as const,
+        stiffness: 80,
+        damping: 15,
+      },
+    },
+  };
+
+  const statsVariants: Variants = {
+    hidden: { scale: 0.9, opacity: 0 },
+    visible: {
+      scale: 1,
+      opacity: 1,
+      transition: {
+        type: "spring" as const,
+        stiffness: 100,
+        damping: 15,
+        delay: 0.2,
+      },
+    },
+  };
+
+  // Fetch teachers với filter
   const fetchTeachers = useCallback(async (page: number = 1, currentFilters: TeacherFilterParams = filters) => {
     setLoading(true);
     try {
@@ -74,7 +128,26 @@ export function TeacherManagementPage() {
     }
   }, [pagination.pageSize, filters, setAlert]);
 
-  // Fetch API statistics (totals, new this month)
+  // Fetch ALL teachers để tính stats (không filter)
+  const fetchAllTeachersForStats = useCallback(async () => {
+    try {
+      // Fetch tất cả giáo viên không filter để tính stats tổng
+      const response = await teacherApi.getAll(1, 10000, {});
+      if (response.success && response.data) {
+        const allTeachers = response.data;
+        const active = allTeachers.filter((t: Teacher) => t.status === true).length;
+        const inactive = allTeachers.filter((t: Teacher) => t.status === false).length;
+        const male = allTeachers.filter((t: Teacher) => t.gender === true).length;
+        const female = allTeachers.filter((t: Teacher) => t.gender === false).length;
+        
+        setAllTeachersStats({ active, inactive, male, female });
+      }
+    } catch (error) {
+      console.error('Failed to fetch all teachers for stats:', error);
+    }
+  }, []);
+
+  // Fetch API statistics (totals, new this month) - KHÔNG FILTER
   const fetchStatistics = async () => {
     try {
       const stats = await teacherApi.getStatistics();
@@ -85,71 +158,49 @@ export function TeacherManagementPage() {
       });
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
-       setAlert?.({ type: 'error', message: 'Không thể tải thống kê giáo viên' });
+      setAlert?.({ type: 'error', message: 'Không thể tải thống kê giáo viên' });
     }
   };
-
-  // Compute derived stats from the teachers list (active/inactive, male/female)
-  const computeDerivedStats = useCallback(() => {
-    const active = teachers.filter(t => t.status === true).length;
-    const inactive = teachers.filter(t => t.status === false).length;
-    const male = teachers.filter(t => t.gender === true).length;
-    const female = teachers.filter(t => t.gender === false).length;
-    setDerivedStats({ active, inactive, male, female });
-  }, [teachers]);
 
   // Initial load
   useEffect(() => {
     fetchTeachers(1);
     fetchStatistics();
+    fetchAllTeachersForStats();
   }, []);
 
-  // Recompute derived stats whenever teachers change
-  useEffect(() => {
-    computeDerivedStats();
-  }, [teachers, computeDerivedStats]);
-
-  // Build stats array for TeacherStats component (6 cards)
+  // Build stats array - SỬ DỤNG DỮ LIỆU TỔNG, KHÔNG BỊ ẢNH HƯỞNG BỞI FILTER
   const teacherStatsData: TeacherStat[] = [
     {
       title: 'Tổng giáo viên',
       value: apiStats.totalTeachers,
       trend: apiStats.percentageIncrease,
       trendDirection: apiStats.percentageIncrease >= 0 ? 'up' : 'down',
-      subText: 'so với tháng trước',
+      type: 'default',
     },
     {
       title: 'Mới trong tháng',
       value: apiStats.newThisMonth,
-      subText: 'giáo viên',
+      trend: apiStats.percentageIncrease,
+      trendDirection: apiStats.percentageIncrease >= 0 ? 'up' : 'down',
+      subText: 'giáo viên mới',
+      type: 'default',
     },
     {
       title: 'Đang hoạt động',
-      value: derivedStats.active,
-      chartData: apiStats.totalTeachers ? [(derivedStats.active / apiStats.totalTeachers) * 100] : [0],
-      subText: `${Math.round((derivedStats.active / apiStats.totalTeachers) * 100) || 0}%`,
+      value: allTeachersStats.active,
+      chartData: apiStats.totalTeachers ? [(allTeachersStats.active / apiStats.totalTeachers) * 100] : [0],
+      subText: `${Math.round((allTeachersStats.active / apiStats.totalTeachers) * 100) || 0}% tổng số`,
+      type: 'status',
     },
     {
-      title: 'Ngưng hoạt động',
-      value: derivedStats.inactive,
-      chartData: apiStats.totalTeachers ? [(derivedStats.inactive / apiStats.totalTeachers) * 100] : [0],
-      subText: `${Math.round((derivedStats.inactive / apiStats.totalTeachers) * 100) || 0}%`,
-    },
-    {
-      title: 'Nam',
-      value: derivedStats.male,
-      chartData: apiStats.totalTeachers ? [(derivedStats.male / apiStats.totalTeachers) * 100] : [0],
-      subText: `${Math.round((derivedStats.male / apiStats.totalTeachers) * 100) || 0}%`,
-    },
-    {
-      title: 'Nữ',
-      value: derivedStats.female,
-      chartData: apiStats.totalTeachers ? [(derivedStats.female / apiStats.totalTeachers) * 100] : [0],
-      subText: `${Math.round((derivedStats.female / apiStats.totalTeachers) * 100) || 0}%`,
+      title: 'Phân bố giới tính',
+      value: `${allTeachersStats.male} | ${allTeachersStats.female}`,
+      type: 'gender',
     },
   ];
 
-  // Handlers (unchanged)
+  // Handlers
   const handleSearch = (query: string) => {
     const newFilters = { ...filters, name: query || undefined };
     setFilters(newFilters);
@@ -194,13 +245,14 @@ export function TeacherManagementPage() {
           setSelectedIds([]);
           fetchTeachers(pagination.currentPage);
           fetchStatistics();
+          fetchAllTeachersForStats(); // Refresh stats sau khi xóa
         } catch (error: any) {
           setAlert?.({ type: 'error', message: error.response?.data?.message || 'Xóa thất bại' });
         }
       }
-    } 
-      
+    }
   };
+
   const handleExportExcel = async () => {
     try {
       const blob = await teacherApi.exportExcel(filters);
@@ -210,12 +262,11 @@ export function TeacherManagementPage() {
       a.download = 'danh-sach-giao-vien.xlsx';
       a.click();
       window.URL.revokeObjectURL(url);
-       setAlert?.({ type: 'success', message: 'Xuất file Excel thành công' });
+      setAlert?.({ type: 'success', message: 'Xuất file Excel thành công' });
     } catch (error) {
       setAlert?.({ type: 'error', message: 'Xuất file thất bại' });
     }
   };
-  
 
   const handleSelectionChange = (ids: number[]) => setSelectedIds(ids);
   const handleAddTeacher = () => setIsAddModalOpen(true);
@@ -235,7 +286,8 @@ export function TeacherManagementPage() {
         setSelectedTeacher(null);
         fetchTeachers(pagination.currentPage);
         fetchStatistics();
-     } else {
+        fetchAllTeachersForStats(); // Refresh stats sau khi cập nhật
+      } else {
         setAlert?.({ type: 'error', message: response.message || 'Cập nhật thất bại' });
       }
     } catch (error: any) {
@@ -251,8 +303,10 @@ export function TeacherManagementPage() {
         setAlert?.({ type: 'success', message: response.message || 'Xóa giáo viên thành công' });
         fetchTeachers(pagination.currentPage);
         fetchStatistics();
+        fetchAllTeachersForStats(); // Refresh stats sau khi xóa
       } catch (error: any) {
-        setAlert?.({ type: 'error', message: error.response?.data?.message || 'Xóa thất bại' });      }
+        setAlert?.({ type: 'error', message: error.response?.data?.message || 'Xóa thất bại' });
+      }
     }
   };
 
@@ -275,7 +329,8 @@ export function TeacherManagementPage() {
         setIsAddModalOpen(false);
         fetchTeachers(pagination.currentPage);
         fetchStatistics();
-       } else {
+        fetchAllTeachersForStats(); // Refresh stats sau khi thêm
+      } else {
         setAlert?.({ type: 'error', message: response.message || 'Thêm giáo viên thất bại' });
       }
     } catch (error: any) {
@@ -284,82 +339,219 @@ export function TeacherManagementPage() {
   };
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="max-w-[1600px] w-full mx-auto px-6 lg:px-8 py-6">
-          {/* Page Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-slate-800">Quản lý giáo viên</h1>
-              <p className="text-sm text-slate-500">Quản lý và tổ chức tất cả giáo viên trong hệ thống</p>
-            </div>
-            <button
-              onClick={handleAddTeacher}
-              className="inline-flex items-center gap-2 px-4 py-2 btn-gradient from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
-            >
-              <Plus className="w-4 h-4" />
-              Thêm giáo viên
-            </button>
-          </div>
+    <motion.main
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="min-h-screen"
+    >
+      {/* Header Section với Gradient Background */}
+      <section className="relative overflow-visible bg-white">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-200 via-indigo-300 to-cyan-200 opacity-30"></div>
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full blur-3xl opacity-40"></div>
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-gradient-to-r from-sky-300 to-transparent rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
 
-          {/* Stats Section */}
-          <div className="mb-6">
-            <TeacherStats stats={teacherStatsData} />
-          </div>
+        <div className="absolute bottom-0 left-0 w-full pointer-events-none z-0">
+          <svg
+            className="relative w-full h-auto"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 1440 250"
+            preserveAspectRatio="none"
+          >
+            <path
+              fill="#f3f5f7"
+              fillOpacity="0.9"
+              d="M0,256L48,240C96,224,192,192,288,186.7C384,181,480,203,576,208C672,213,768,203,864,186.7C960,171,1056,149,1152,138.7C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            ></path>
+          </svg>
+        </div>
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-9">
-              <div className="mb-4">
-                <TeacherToolbar
-                  onSearch={handleSearch}
-                  onFilterChange={handleFilterChange}
-                  onClearFilters={handleClearFilters}
-                  selectedCount={selectedIds.length}
-                  onBulkAction={handleBulkAction}
-                  onAddTeacher={handleAddTeacher}
-                  viewMode={viewMode}
-                  onViewModeChange={handleViewModeChange}
-                  currentFilters={{
-                    specialty: filters.specialty,
-                    gender: filters.gender === true ? 'male' : filters.gender === false ? 'female' : undefined,
-                    status: filters.status === true ? 'active' : filters.status === false ? 'inactive' : undefined,
-                  }}
-                />
+        <motion.div
+          variants={headerVariants}
+          className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10"
+        >
+          <motion.div
+            variants={contentVariants}
+            className="relative overflow-hidden"
+          >
+            <div className="relative px-6 py-6 lg:px-8">
+              {/* Header Content */}
+              <div className="w-full flex flex-col space-y-6">
+                {/* Header Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 px-3 py-1.5">
+                      <Sparkles size={14} className="text-indigo-500" />
+                      <span className="text-indigo-500 text-xs font-medium">Quản trị viên</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                      <h1 className="text-gray-900 text-3xl lg:text-4xl font-bold tracking-tight">
+                        Quản lý <span className="gradient-text">giáo viên</span>
+                      </h1>
+                      <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
+                        <span>Quản lý và tổ chức tất cả giáo viên trong hệ thống</span>
+                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp size={14} className="text-blue-500" />
+                          Đang có {apiStats.totalTeachers} giáo viên
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <input
+                          type="search"
+                          placeholder="Tìm kiếm giáo viên..."
+                          className="peer w-80 pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm rounded-xl text-sm text-gray-700 outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-400/50 transition-all placeholder:text-gray-400"
+                          onChange={(e) => handleSearch(e.target.value)}
+                        />
+                        <Search
+                          size={18}
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors peer-focus:text-indigo-500"
+                        />
+                      </div>
+                      <button
+                        onClick={handleExportExcel}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl shadow-sm hover:bg-gray-50 transition-all duration-200"
+                      >
+                        <Download className="w-4 h-4" />
+                        Xuất Excel
+                      </button>
+                      <button
+                        onClick={handleAddTeacher}
+                        className="group relative flex items-center gap-2 px-5 py-2.5 btn-gradient rounded-xl text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+                      >
+                        <Plus size={18} className="text-white group-hover:rotate-90 transition-transform duration-300" />
+                        <span>Thêm giáo viên</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Teacher Stats - KHÔNG BỊ ẢNH HƯỞNG BỞI FILTER */}
+                <motion.div
+                  variants={statsVariants}
+                  className="w-full"
+                >
+                  <TeacherStats stats={teacherStatsData} />
+                </motion.div>
               </div>
-              <TeacherTable
-                teachers={teachers}
-                loading={loading}
-                total={pagination.totalItems}
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-                onSelectionChange={handleSelectionChange}
-                onEditTeacher={handleEditTeacher}
-                onViewTeacher={handleViewTeacher}
+            </div>
+          </motion.div>
+        </motion.div>
+      </section>
+
+      {/* Main Content */}
+      <motion.div
+        variants={contentVariants}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+      >
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left Content */}
+          <div className="col-span-12 lg:col-span-9">
+            <div className="mb-4">
+              <TeacherToolbar
+                onSearch={handleSearch}
+                onFilterChange={handleFilterChange}
+                onClearFilters={handleClearFilters}
+                selectedCount={selectedIds.length}
+                onBulkAction={handleBulkAction}
+                onAddTeacher={handleAddTeacher}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
+                currentFilters={{
+                  specialty: filters.specialty,
+                  gender: filters.gender === true ? 'male' : filters.gender === false ? 'female' : undefined,
+                  status: filters.status === true ? 'active' : filters.status === false ? 'inactive' : undefined,
+                }}
               />
             </div>
-            <div className="col-span-12 lg:col-span-3">
-              <div className="space-y-6 sticky top-6">
-                <QuickActions onExport={handleExportExcel} />
-                <RecentActivities activities={[]} />
+            <TeacherTable
+              teachers={teachers}
+              loading={loading}
+              total={pagination.totalItems}
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+              onSelectionChange={handleSelectionChange}
+              onEditTeacher={handleEditTeacher}
+              onViewTeacher={handleViewTeacher}
+            />
+          </div>
+
+          {/* Right Sidebar */}
+          <div className="col-span-12 lg:col-span-3">
+            <div className="space-y-6 sticky top-6">
+              <QuickActions onExport={handleExportExcel} />
+              <RecentActivities activities={[]} />
+
+              {/* Pro Feature Card */}
+              <div className="btn-gradient rounded-2xl p-5 text-white shadow-lg shadow-purple-500/20 relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-yellow-300" />
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-80">Tính năng Pro</p>
+                  </div>
+                  <h4 className="text-lg font-bold mt-1">Phân tích thông minh</h4>
+                  <p className="text-xs mt-2 opacity-90 leading-relaxed">
+                    Dự đoán hiệu suất giảng dạy của giáo viên với các mô hình AI mới. Có sẵn trong gói của bạn!
+                  </p>
+                  <button className="mt-4 bg-white text-purple-600 px-4 py-1.5 rounded-lg text-[10px] font-bold hover:bg-gray-100 transition-colors uppercase flex items-center gap-1">
+                    Khám phá ngay
+                    <Sparkles className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <AddTeacherModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSubmit={handleSubmitTeacher} />
-      <EditTeacherModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setSelectedTeacher(null);
-        }}
-        teacher={selectedTeacher}
-        onSave={handleSaveTeacher}
-        onDelete={handleDeleteTeacher}
-      />
-    </>
+      {/* Modals */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <AddTeacherModal
+              isOpen={isAddModalOpen}
+              onClose={() => setIsAddModalOpen(false)}
+              onSubmit={handleSubmitTeacher}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isEditModalOpen && selectedTeacher && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <EditTeacherModal
+              isOpen={isEditModalOpen}
+              onClose={() => {
+                setIsEditModalOpen(false);
+                setSelectedTeacher(null);
+              }}
+              teacher={selectedTeacher}
+              onSave={handleSaveTeacher}
+              onDelete={handleDeleteTeacher}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.main>
   );
 }

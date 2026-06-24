@@ -37,19 +37,6 @@ if (typeof Highcharts === 'object') {
 
 const bluePalette = ['#224D7A', '#417BB9', '#A8C7E5', '#7BB0DF'];
 
-const getColorByLevel = (level: string) => {
-  switch (level) {
-    case 'Cấp 1 (Tiểu học)':
-      return '#14b8a6';
-    case 'Cấp 2 (THCS)':
-      return '#f97316';
-    case 'Cấp 3 (THPT)':
-      return '#8b5cf6';
-    default:
-      return '#94a3b8';
-  }
-};
-
 const palettes = [
   { bg: "bg-purple-50", text: "text-violet-600", bar: "bg-violet-500" },
   { bg: "bg-blue-50", text: "text-blue-600", bar: "bg-blue-500" },
@@ -320,14 +307,68 @@ export const ClassListSection = ({
             textOutline: 'none'
           }
         },
-        showInLegend: false
+        showInLegend: false,
+        // Thêm cấu hình tooltip cho từng phần tử
+        tooltip: {
+          pointFormatter: function (this: any) {
+            return `<span style="font-size: 10px; color: #94a3b8;">${this.name}</span><br/>
+                  <span style="font-weight: 600; color: #1e293b;">Số lượng: ${this.y} lớp</span><br/>
+                  <span style="font-size: 11px; color: ${this.color};">Tỷ lệ: ${this.percentage?.toFixed(1)}%</span>`;
+          }
+        }
       }
     },
     series: [{
       type: 'pie',
       name: 'Số lượng lớp',
-      data: levelData
-    }]
+      data: levelData,
+      // Tooltip cho toàn bộ series
+      tooltip: {
+        pointFormat: '<span style="font-size: 10px; color: #94a3b8;">{point.name}</span><br/>' +
+          '<span style="font-weight: 600; color: #1e293b;">Số lượng: {point.y} lớp</span><br/>' +
+          '<span style="font-size: 11px; color: {point.color};">Tỷ lệ: {point.percentage:.1f}%</span>'
+      }
+    }],
+    // Tooltip chung cho toàn bộ biểu đồ
+    tooltip: {
+      backgroundColor: '#1e293b',
+      borderColor: '#334155',
+      borderRadius: 12,
+      borderWidth: 0,
+      shadow: true,
+      style: {
+        color: '#f1f5f9',
+        fontSize: '11px',
+        fontFamily: 'inherit',
+        padding: '0px'
+      },
+      padding: 8,
+      useHTML: true,
+      formatter: function (this: any) {
+        const point = this.point;
+        const percentage = point.percentage?.toFixed(1);
+        const color = point.color;
+
+        return `
+        <div style="padding: 4px 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background-color: ${color}; box-shadow: 0 0 0 1px rgba(255,255,255,0.2);"></div>
+            <span style="font-size: 12px; font-weight: 600; color: #ffffff;">${point.name}</span>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 4px;">
+            <div>
+              <span style="font-size: 9px; color: #94a3b8; text-transform: uppercase;">Số lớp</span>
+              <div style="font-size: 16px; font-weight: 700; color: #ffffff;">${point.y}</div>
+            </div>
+            <div>
+              <span style="font-size: 9px; color: #94a3b8; text-transform: uppercase;">Tỷ lệ</span>
+              <div style="font-size: 16px; font-weight: 700; color: ${color};">${percentage}%</div>
+            </div>
+          </div>
+        </div>
+      `;
+      }
+    }
   };
 
   const ClassCard = ({ subject, palette }: ClassCardProps) => {
@@ -361,6 +402,21 @@ export const ClassListSection = ({
     };
 
     const statusStyle = getStatusStyle();
+
+    const getBillingTypeLabel = (type: string | null) => {
+      if (!type) return '/tháng';
+      return type === 'PER_HOUR' ? '/giờ' : '/tháng';
+    };
+
+    const getBillingTypeDisplay = (type: string | null) => {
+      if (!type) return 'Theo tháng';
+      return type === 'PER_HOUR' ? 'Theo giờ' : 'Theo môn';
+    };
+
+    const getPaymentPlanLabel = (type: string | null) => {
+      if (!type) return 'Chưa thiết lập';
+      return type === 'FULL' ? 'Trả toàn bộ' : 'Trả góp';
+    };
 
     return (
       <div
@@ -462,10 +518,23 @@ export const ClassListSection = ({
             </div>
             <div className="flex-1 bg-gradient-to-br from-slate-50 to-white rounded-lg p-1.5 border border-slate-100">
               <p className="text-slate-400 font-bold text-[8px] mb-0.5 uppercase tracking-wider">HỌC PHÍ</p>
-              <p className="font-bold gradient-text text-[10px]">
-                {subject.price.toLocaleString()}đ
+              <div className="flex items-center justify-between gap-1">
+                <p className="font-bold gradient-text text-[10px]">
+                  {subject.price.toLocaleString()}đ
+                </p>
+                <span className={`text-[7px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${subject.paymentPlanType === 'INSTALLMENT'
+                    ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                    : 'bg-blue-50 text-blue-600 border border-blue-200'
+                  }`}>
+                  {getPaymentPlanLabel(subject.paymentPlanType)}
+                  {subject.paymentPlanType === 'INSTALLMENT' && subject.installmentCount && (
+                    <> ({subject.installmentCount} kỳ)</>
+                  )}
+                </span>
+              </div>
+              <p className="text-[8px] text-slate-400">
+                {getBillingTypeLabel(subject.billingType)}
               </p>
-              <p className="text-[8px] text-slate-400">/tháng</p>
             </div>
           </div>
 
@@ -533,161 +602,152 @@ export const ClassListSection = ({
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Subjects Chart */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-              <div className="p-4">
-                <div className="mb-10">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-indigo-100 rounded-lg shadow-sm">
-                        <BarChart size={14} className="text-indigo-500" />
+            <div className="lg:col-span-2 flex">
+              <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden w-full">
+                <div className="p-4">
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-indigo-100 rounded-lg shadow-sm">
+                          <BarChart size={14} className="text-indigo-500" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          Tỷ lệ lấp đầy lớp học
+                        </h3>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-800">
-                        Tỷ lệ lấp đầy lớp học
-                      </h3>
                     </div>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Hiệu suất tuyển sinh theo từng lớp</p>
-                </div>
-
-                <div className="relative mt-2">
-                  <div className="absolute left-0 right-0 h-full flex flex-col justify-between pointer-events-none">
-                    {[100, 75, 50, 25, 0].map((line) => (
-                      <div key={line} className="relative">
-                        <div className="border-t border-slate-100"></div>
-                        <span className="absolute -left-2 -top-2 text-[9px] text-slate-400">{line}%</span>
-                      </div>
-                    ))}
+                    <p className="text-[11px] text-slate-500 mt-0.5">Hiệu suất tuyển sinh theo từng lớp</p>
                   </div>
 
-                  <div className="h-44 flex items-end justify-between gap-2 ml-6">
-                    {subjectChartData.map((subject, idx) => {
-                      const barHeight = (subject.value / maxFillRate) * chartHeight;
-                      const isHigh = subject.value >= 80;
-                      const isMedium = subject.value >= 50 && subject.value < 80;
-                      const isLow = subject.value < 50;
+                  <div className="relative mt-2">
+                    <div className="absolute left-0 right-0 h-full flex flex-col justify-between pointer-events-none">
+                      {[100, 75, 50, 25, 0].map((line) => (
+                        <div key={line} className="relative">
+                          <div className="border-t border-slate-100"></div>
+                          <span className="absolute -left-2 -top-2 text-[9px] text-slate-400">{line}%</span>
+                        </div>
+                      ))}
+                    </div>
 
-                      let barColor = "from-emerald-500 to-emerald-400";
-                      let barBg = "bg-emerald-100";
-                      if (isMedium) {
-                        barColor = "from-blue-500 to-blue-400";
-                        barBg = "bg-blue-100";
-                      } else if (isLow) {
-                        barColor = "from-amber-500 to-amber-400";
-                        barBg = "bg-amber-100";
-                      }
+                    <div className="h-44 flex items-end justify-between gap-2 ml-6">
+                      {subjectChartData.map((subject, idx) => {
+                        const barHeight = (subject.value / maxFillRate) * chartHeight;
+                        const isHigh = subject.value >= 80;
+                        const isMedium = subject.value >= 50 && subject.value < 80;
+                        const isLow = subject.value < 50;
 
-                      return (
-                        <div key={idx} className="flex flex-col items-center flex-1 group">
-                          <div className="relative w-full flex justify-center">
-                            {/* Tooltip */}
-                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-20 w-max max-w-[160px] 
+                        let barColor = "from-emerald-500 to-emerald-400";
+                        let barBg = "bg-emerald-100";
+                        if (isMedium) {
+                          barColor = "from-blue-500 to-blue-400";
+                          barBg = "bg-blue-100";
+                        } else if (isLow) {
+                          barColor = "from-amber-500 to-amber-400";
+                          barBg = "bg-amber-100";
+                        }
+
+                        return (
+                          <div key={idx} className="flex flex-col items-center flex-1 group">
+                            <div className="relative w-full flex justify-center">
+                              {/* Tooltip */}
+                              <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-20 w-max max-w-[160px] 
                             bg-slate-800 text-white text-[10px] px-2 py-1 rounded-lg shadow-lg 
                             pointer-events-none opacity-0 group-hover:opacity-100 transition-all duration-200 
                             flex items-center gap-1.5 whitespace-nowrap">
-                              <span className="font-semibold">{subject.name}</span>
-                              <span className="text-emerald-400">{subject.displayValue}</span>
-                              <span>({subject.value}%)</span>
-                              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45"></div>
-                            </div>
-
-                            {/* Bar */}
-                            <div
-                              className={`w-10 rounded-t-lg transition-all duration-500 ease-out cursor-pointer relative overflow-hidden shadow-sm group-hover:shadow-md ${barBg}`}
-                              style={{ height: `${Math.max(barHeight, 4)}px` }}
-                            >
-                              <div
-                                className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${barColor} transition-all duration-500`}
-                                style={{ height: `${subject.value}%` }}
-                              >
-                                <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <span className="font-semibold">{subject.name}</span>
+                                <span className="text-emerald-400">{subject.displayValue}</span>
+                                <span>({subject.value}%)</span>
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45"></div>
                               </div>
-                              {subject.value >= 25 && (
-                                <span className="absolute bottom-1 left-0 right-0 text-center text-white font-bold text-[9px] drop-shadow-sm z-10">
-                                  {subject.value}%
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span className="mt-1.5 text-[9px] text-slate-500 font-medium truncate w-full text-center px-1">
-                            {subject.name.length > 10 ? subject.name.slice(0, 8) + '…' : subject.name}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                <div className="mt-3 pt-2 border-t border-slate-100 flex justify-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <span className="text-[8px] text-slate-500">Tốt (≥80%)</span>
+                              {/* Bar */}
+                              <div
+                                className={`w-10 rounded-t-lg transition-all duration-500 ease-out cursor-pointer relative overflow-hidden shadow-sm group-hover:shadow-md ${barBg}`}
+                                style={{ height: `${Math.max(barHeight, 4)}px` }}
+                              >
+                                <div
+                                  className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${barColor} transition-all duration-500`}
+                                  style={{ height: `${subject.value}%` }}
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                                {subject.value >= 25 && (
+                                  <span className="absolute bottom-1 left-0 right-0 text-center text-white font-bold text-[9px] drop-shadow-sm z-10">
+                                    {subject.value}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="mt-1.5 text-[9px] text-slate-500 font-medium truncate w-full text-center px-1">
+                              {subject.name.length > 10 ? subject.name.slice(0, 8) + '…' : subject.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-[8px] text-slate-500">Trung bình (50-79%)</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                    <span className="text-[8px] text-slate-500">Cần cải thiện (&lt;50%)</span>
+
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex justify-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                      <span className="text-[8px] text-slate-500">Tốt (≥80%)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span className="text-[8px] text-slate-500">Trung bình (50-79%)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                      <span className="text-[8px] text-slate-500">Cần cải thiện (&lt;50%)</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Grade Distribution */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-              <div className="p-4">
-                <div className="mb-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-indigo-100 rounded-lg shadow-sm">
-                        <PieChart size={14} className="text-indigo-500" />
+            <div className="lg:col-span-1 flex">
+              <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden w-full">
+                <div className="p-4">
+                  <div className="mb-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-indigo-100 rounded-lg shadow-sm">
+                          <PieChart size={14} className="text-indigo-500" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          Phân bố lớp học
+                        </h3>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-800">
-                        Phân bố lớp học
-                      </h3>
-                    </div>
-                    <div className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                      {totalSubjectsCount} lớp
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Chi tiết theo cấp học</p>
-                </div>
-
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-full h-[220px]">
-                    {levelData.length > 0 ? (
-                      <HighchartsReact highcharts={Highcharts} options={pie3dOptions} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
-                        Đang tải dữ liệu...
+                      <div className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {totalSubjectsCount} lớp
                       </div>
-                    )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Chi tiết theo cấp học</p>
                   </div>
 
-                  <div className="w-full space-y-1 mt-1">
-                    {levelData.map((level, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-50 transition-all duration-200"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full shadow-sm"
-                            style={{ backgroundColor: bluePalette[i % bluePalette.length] }}
-                          />
-                          <span className="font-medium text-xs text-slate-700">{level.name}</span>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="w-full h-[220px]">
+                      {levelData.length > 0 ? (
+                        <HighchartsReact highcharts={Highcharts} options={pie3dOptions} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                          Đang tải dữ liệu...
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold text-slate-800">
-                            {level.y}
-                          </span>
-                          <span className="text-[10px] text-slate-400">lớp</span>
+                      )}
+                    </div>
+
+                    <div className="w-full space-y-1 mt-1">
+                      {levelData.map((level, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-50 transition-all duration-200"
+                        >
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

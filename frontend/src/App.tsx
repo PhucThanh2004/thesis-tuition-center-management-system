@@ -30,8 +30,12 @@ import { LeaveRequestDetail } from './app/pages/admin/leaves/LeaveRequestDetail'
 import { LeaveManagementPage } from './app/pages/admin/leaves/LeaveManagementPage';
 import { TeacherLeaveManagementPage } from './app/pages/teacher/TeacherLeaveManagementPage';
 import { PayrollPage } from './app/pages/admin/PayrollPage';
-import {TeacherPayrollPage} from './app/pages/teacher/TeacherPayrollPage';
+import { TeacherPayrollPage } from './app/pages/teacher/TeacherPayrollPage';
 import { ScrollToTop } from './app/components/ScrollToTop';
+import RecentActivityPage from './app/pages/admin/RecentActivityPage';
+import TeacherRecentActivityPage from './app/pages/teacher/TeacherRecentActivityPage';
+import TuitionPage from './app/pages/admin/TuitionPage';
+import TuitionDetailPage from './app/pages/admin/TuitionDetailPage';
 
 
 function App() {
@@ -40,7 +44,7 @@ function App() {
 
   return (
     <BrowserRouter>
-    <ScrollToTop />
+      <ScrollToTop />
       <Routes>
         <Route
           path="/"
@@ -120,7 +124,7 @@ function App() {
             path="profile"
             element={
               <ProtectedRoute allowedRoles={['R0']}>
-                <ProfilePage />
+                <ProfilePage isTeacher={false} />
               </ProtectedRoute>
             }
           />
@@ -163,12 +167,12 @@ function App() {
             }
           />
 
-          {/* Trang tài liệu chung */}
+          {/* Trang hoạt động */}
           <Route
-            path="documents"
+            path="recent-activity"
             element={
               <ProtectedRoute allowedRoles={['R0']}>
-                <LibraryPage />
+                <RecentActivityPage />
               </ProtectedRoute>
             }
           />
@@ -189,16 +193,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="teacher/leave/calendar"
-            element={
-              <ProtectedRoute>
-                <LeaveCalendarPage />
-              </ProtectedRoute>
-            }
-          />
-
 
           {/* Trang thông báo */}
           <Route
@@ -237,19 +231,29 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Các trang khác thêm tương tự ở đây nha */}
-        </Route>
-
-        {/* Teacher routes */}
-        <Route path="/teacher" element={<TeacherLayout />}>
           <Route
-            path="home"
+            path="tuition"
             element={
-              <ProtectedRoute allowedRoles={['R1']}>
-                <TeacherHome />
+              <ProtectedRoute allowedRoles={['R0']}>
+                <TuitionPage />
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="tuition/:id"
+            element={
+              <ProtectedRoute allowedRoles={['R0']}>
+                <TuitionDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Các trang khác thêm tương tự ở đây nha */}
+        </Route>
+
+
+        {/* Teacher routes */}
+        <Route path="/teacher" element={<TeacherLayout />}>
           <Route
             path="classes"
             element={
@@ -303,9 +307,26 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Có thể thêm /teacher/schedule, /teacher/class/:id... */}
-        </Route>
 
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute allowedRoles={['R1']}>
+                <ProfilePage isTeacher={true} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="recent-activity"
+            element={
+              <ProtectedRoute allowedRoles={['R1']}>
+                <TeacherRecentActivityPage />
+              </ProtectedRoute>
+            }
+          />
+
+        </Route>
 
         {/* Unauthorized page */}
         <Route path="/unauthorized" element={<div>Bạn không có quyền truy cập trang này.</div>} />

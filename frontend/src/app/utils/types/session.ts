@@ -83,11 +83,11 @@ export interface DailySession {
   endTime: string
   roomName: string | null
   teacher: {
-  id: number
-  fullName: string
-} | null
+    id: number
+    fullName: string
+  } | null
   status: SessionStatus
-   teacherLeaveInfo?: TeacherLeaveInfo;
+  teacherLeaveInfo?: TeacherLeaveInfo;
 }
 
 export interface SessionTeacherInfo {
@@ -139,6 +139,16 @@ export interface SessionDetail {
   room: SessionRoomInfo | null
   studentAttendances: StudentAttendanceInfo[]
   teacherAttendance: TeacherAttendanceInfo | null
+
+  // Các field nội dung - trực tiếp ở root level
+  isFollowingPlan: boolean
+  displayTopic: string | null
+  displayContent: string | null
+  displayHomework: string | null
+  plannedTopic: string | null
+  plannedSessionDetailId: number | null
+  deviationReason: string | null
+  noteForNextSession: string | null
 }
 
 export interface SessionActualContentUpdate {

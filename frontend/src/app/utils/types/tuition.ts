@@ -41,6 +41,7 @@ export interface TuitionDetailResponse {
 }
 
 export interface TuitionDetailItem {
+  paidAmount: number;
   id: number;
   subject: {
     id: number;

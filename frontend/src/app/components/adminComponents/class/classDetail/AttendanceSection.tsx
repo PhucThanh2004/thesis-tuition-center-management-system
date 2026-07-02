@@ -28,12 +28,13 @@ import type { Subject } from "../../../../utils/types/subject";
 import { sessionApi } from "../../../../utils/api";
 import type { SessionOfSubject } from "../../../../utils/types/session";
 import { attendanceApi } from "../../../../utils/api/attendance.api";
-import type { AttendanceResponse, AttendanceItem } from "../../../../utils/types/attendance";
+import type { AttendanceResponse, AttendanceItem, ImportResult } from "../../../../utils/types/attendance";
 import type { TeacherAttendanceItem, TeacherAttendanceResponse } from "../../../../utils/types/teacher-attendance";
 import { teacherAttendanceApi } from "../../../../utils/api/teacherAttendance.api";
 import { useOutletContext } from "react-router-dom";
 import { SessionContentModal } from "./SessionContentModal";
 import { cn } from "../../../../utils/cn";
+import { AttendanceExportImport } from "./AttendanceExportImport";
 
 type StatusType = "present" | "late" | "absent";
 
@@ -143,6 +144,7 @@ const retryRequest = async <T,>(
 
   throw lastError;
 };
+
 
 // Helper: Generate initials from full name
 const getInitials = (name: string) => {
@@ -774,16 +776,16 @@ const StudentCard: React.FC<{
           </div>
           <div className="flex items-center gap-3 mt-0.5">
             <div className="flex items-center gap-1">
-             <span className={cn(
-              "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-              student.gender === true
-                ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                : student.gender === false
-                  ? "bg-pink-50 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400"
-                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-            )}>
-              {student.gender === true ? "Nam" : student.gender === false ? "Nữ" : "Khác"}
-            </span>
+              <span className={cn(
+                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                student.gender === true
+                  ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  : student.gender === false
+                    ? "bg-pink-50 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400"
+                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              )}>
+                {student.gender === true ? "Nam" : student.gender === false ? "Nữ" : "Khác"}
+              </span>
             </div>
             <div className="flex items-center gap-1">
               <School size={10} className="text-slate-400" />
@@ -824,7 +826,7 @@ const StudentCard: React.FC<{
         </div>
 
         {/* Note Input */}
-        <div 
+        <div
           className="relative min-w-[160px] sm:min-w-[180px] md:min-w-[200px]"
           onMouseEnter={() => setIsHoveringNote(true)}
           onMouseLeave={() => setIsHoveringNote(false)}
@@ -1195,8 +1197,63 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
   const [showContentModal, setShowContentModal] = useState(false);
   const [hasUpdatedContent, setHasUpdatedContent] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<StatusType | "">("");
+  const [importExportKey, setImportExportKey] = useState(0)
+  const [isFutureSession, setIsFutureSession] = useState(false)
 
   const { setAlert } = useOutletContext<any>();
+
+  const checkIsFutureSession = (session: Session | null): boolean => {
+    if (!session?.sessionDate) return false
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const sessionDate = new Date(session.sessionDate)
+    sessionDate.setHours(0, 0, 0, 0)
+
+    return sessionDate > today
+  }
+
+  const handleImportSuccess = (result: ImportResult) => {
+    setAlert?.({
+      type: "success",
+      message: `Import danh sách điểm danh thành công!`,
+      duration: 5000,
+    })
+
+    // Refresh data sau khi import thành công
+    if (subject?.id && selectedSession) {
+      fetchAttendanceData(subject.id, selectedSession.id)
+      fetchTeacherAttendanceData()
+    }
+
+    // Force re-render của component import/export
+    setImportExportKey(prev => prev + 1)
+  }
+
+  const handleImportError = (error: string) => {
+    setAlert?.({
+      type: "error",
+      message: `Import thất bại: ${error}`,
+      duration: 5000,
+    })
+  }
+
+  const handleExportSuccess = () => {
+    setAlert?.({
+      type: "success",
+      message: "Export dữ liệu thành công!",
+      duration: 3000,
+    })
+  }
+
+  const handleExportError = (error: string) => {
+    setAlert?.({
+      type: "error",
+      message: `Export thất bại: ${error}`,
+      duration: 5000,
+    })
+  }
 
   const checkForChanges = () => {
     const studentChanges = JSON.stringify(studentList) !== JSON.stringify(originalStudentList);
@@ -1315,7 +1372,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
         mappedStudents.push({
           id: student.studentId.toString(),
           name: student.fullName,
-          gender: student.gender,       
+          gender: student.gender,
           schoolName: student.schoolName,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(student.fullName)}&background=6366f1&color=fff`,
           status: uiStatus,
@@ -1695,6 +1752,8 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
 
   useEffect(() => {
     if (subject?.id && selectedSession) {
+      setIsFutureSession(checkIsFutureSession(selectedSession))
+
       const loadData = async () => {
         const hasContent = await checkSessionContentStatus(selectedSession.id);
 
@@ -1788,14 +1847,15 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
         <div className="px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+              <h1 className="text-xl font-bold gradient-text dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
                 Điểm danh
               </h1>
-              <p className="text-xs text-gray-400 mt-0.5">{selectedSession?.title || subject?.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{selectedSession?.title || subject?.name} | Ngày: {selectedSession?.date}</p>
             </div>
 
             {!isCurrentSessionCanceled && (
               <div className="flex flex-wrap items-center gap-3">
+                {/* Search input - LUÔN HIỂN THỊ */}
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -1807,6 +1867,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
                   />
                 </div>
 
+                {/* Status filter - LUÔN HIỂN THỊ */}
                 <div className="relative">
                   <select
                     value={statusFilter}
@@ -1821,54 +1882,73 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
 
-                <div className="relative">
-                  <select
-                    value={bulkStatus}
-                    onChange={(e) => handleBulkStatusChange(e.target.value as StatusType)}
-                    className="appearance-none pl-3 pr-8 py-2 text-sm bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition-all"
-                  >
-                    <option value="">Điểm danh tất cả</option>
-                    <option value="present">Có mặt</option>
-                    <option value="late">Muộn</option>
-                    <option value="absent">Vắng</option>
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400 pointer-events-none" />
-                </div>
+                {/* IMPORT/EXPORT - LUÔN HIỂN THỊ */}
+                <AttendanceExportImport
+                  key={importExportKey}
+                  subjectId={subject?.id || 0}
+                  subjectName={subject?.name}
+                  onImportSuccess={handleImportSuccess}
+                  onImportError={handleImportError}
+                  onExportSuccess={handleExportSuccess}
+                  onExportError={handleExportError}
+                />
 
-                {hasChanges && (
-                  <motion.button
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    onClick={handleRevert}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-all duration-200"
-                  >
-                    <XCircle size={16} />
-                    Hủy thay đổi
-                  </motion.button>
+                {/* CHỈ HIỂN THỊ KHI KHÔNG PHẢI BUỔI HỌC TƯƠNG LAI */}
+                {!isFutureSession && (
+                  <>
+                    {/* Bulk status */}
+                    <div className="relative">
+                      <select
+                        value={bulkStatus}
+                        onChange={(e) => handleBulkStatusChange(e.target.value as StatusType)}
+                        className="appearance-none pl-3 pr-8 py-2 text-sm bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition-all"
+                      >
+                        <option value="">Điểm danh tất cả</option>
+                        <option value="present">Có mặt</option>
+                        <option value="late">Muộn</option>
+                        <option value="absent">Vắng</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400 pointer-events-none" />
+                    </div>
+
+                    {/* Revert button */}
+                    {hasChanges && (
+                      <motion.button
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.9, opacity: 0 }}
+                        onClick={handleRevert}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-all duration-200"
+                      >
+                        <XCircle size={16} />
+                        Hủy thay đổi
+                      </motion.button>
+                    )}
+
+                    {/* Save button */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSave}
+                      disabled={isSaving || !hasChanges}
+                      className={clsx(
+                        "flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-medium shadow-lg transition-all duration-200",
+                        hasChanges
+                          ? "btn-gradient shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30"
+                          : "bg-gray-400 cursor-not-allowed shadow-none",
+                        "disabled:opacity-70 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      {isSaving ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Save size={16} />
+                      )}
+                      {isSaving ? "Đang lưu..." : hasChanges ? "Lưu điểm danh" : "Đã lưu"}
+                    </motion.button>
+                  </>
                 )}
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleSave}
-                  disabled={isSaving || !hasChanges}
-                  className={clsx(
-                    "flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-medium shadow-lg transition-all duration-200",
-                    hasChanges
-                      ? "btn-gradient shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30"
-                      : "bg-gray-400 cursor-not-allowed shadow-none",
-                    "disabled:opacity-70 disabled:cursor-not-allowed"
-                  )}
-                >
-                  {isSaving ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Save size={16} />
-                  )}
-                  {isSaving ? "Đang lưu..." : hasChanges ? "Lưu điểm danh" : "Đã lưu"}
-                </motion.button>
               </div>
             )}
           </div>
@@ -1899,6 +1979,28 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
           </div>
 
           <div className="lg:col-span-8 space-y-5">
+            {/* ✅ THÊM CẢNH BÁO CHO BUỔI HỌC TƯƠNG LAI */}
+            {isFutureSession && !isCurrentSessionCanceled && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3"
+              >
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Calendar size={18} className="text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    📅 Buổi học chưa diễn ra
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                    Bạn có thể xem danh sách học sinh và <strong>export</strong> để chuẩn bị,
+                    nhưng chưa thể điểm danh. Buổi học sẽ diễn ra vào ngày <strong>{selectedSession?.date}</strong>.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
             <TeacherCard
               subject={subject}
               session={selectedSession}
@@ -1906,7 +2008,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({ subject })
               teacherNote={teacherNote}
               onStatusChange={handleTeacherStatusChange}
               onNoteChange={handleTeacherNoteChange}
-              isReadOnly={false}
+              isReadOnly={isFutureSession || false}  
               isCanceled={isCurrentSessionCanceled}
             />
 

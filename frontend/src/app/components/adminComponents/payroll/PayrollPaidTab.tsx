@@ -1,3 +1,4 @@
+// src/components/payroll/PayrollPaidTab.tsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useOutletContext } from 'react-router-dom';
@@ -10,13 +11,18 @@ import {
   Award,
   FileCheck,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Clock,
+  User,
+  Receipt,
+  ExternalLink,
+  AlertCircle
 } from 'lucide-react';
 import { payrollApi } from '../../../utils/api/payroll.api';
 import type { PayrollListItem } from '../../../utils/types/payroll';
 import './payroll.css';
-import PaymentModal from './PaymentModal';
-interface PayrollFinalizedTabProps {
+
+interface PayrollPaidTabProps {
   refreshTrigger: number;
 }
 
@@ -64,7 +70,7 @@ const statsCardVariants: Variants = {
 };
 
 // Skeleton loader
-const FinalizedSkeleton: React.FC = () => (
+const PaidSkeleton: React.FC = () => (
   <div className="space-y-5">
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {[1, 2, 3, 4].map(i => (
@@ -141,19 +147,27 @@ const KPICard: React.FC<{
   );
 };
 
-// Finalized Payroll Card Component
-const FinalizedPayrollCard: React.FC<{
+// Paid Payroll Card Component - Cập nhật hiển thị
+const PaidPayrollCard: React.FC<{
   payroll: PayrollListItem;
   index: number;
-  onPay?: (paymentId: number) => void;
-}> = ({ payroll, index, onPay }) => {
+}> = ({ payroll, index }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN').format(amount);
   };
-  const canPay = payroll.status === 'FINALIZED' || payroll.status === 'PARTIAL_PAID';
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('vi-VN');
+    } catch {
+      return dateString;
+    }
+  };
+
+  // 🔥 Tính toán số tiền đã thanh toán và còn lại
   const paidAmount = payroll.paidAmount || 0;
   const remainingAmount = payroll.amount - paidAmount;
-
+  const isPartial = payroll.status === 'PARTIAL_PAID';
 
   return (
     <motion.div
@@ -164,19 +178,17 @@ const FinalizedPayrollCard: React.FC<{
       whileHover={{ scale: 1.01, y: -1 }}
       className="group relative rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-200 overflow-hidden"
     >
-      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500" />
+      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
+        isPartial ? 'from-amber-400 to-amber-500' : 'from-emerald-400 to-emerald-500'
+      }`} />
 
       <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-              {payroll.status === 'PAID' ? (
-                <DollarSign className="h-5 w-5 text-emerald-600" />
-              ) : payroll.status === 'PARTIAL_PAID' ? (
-                <DollarSign className="h-5 w-5 text-amber-600" />
-              ) : (
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
-              )}
+            <div className={`h-10 w-10 rounded-full bg-gradient-to-br flex items-center justify-center group-hover:scale-110 transition-transform duration-200 ${
+              isPartial ? 'from-amber-100 to-amber-50' : 'from-emerald-100 to-emerald-50'
+            }`}>
+              <DollarSign className={`h-5 w-5 ${isPartial ? 'text-amber-600' : 'text-emerald-600'}`} />
             </div>
           </div>
 
@@ -185,33 +197,39 @@ const FinalizedPayrollCard: React.FC<{
               <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
                 Tháng {payroll.month}/{payroll.year}
               </p>
-              {payroll.status === 'PAID' && (
+              {!isPartial ? (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700">
-                  <DollarSign className="h-2.5 w-2.5" />
+                  <CheckCircle className="h-2.5 w-2.5" />
                   Đã thanh toán
                 </span>
-              )}
-              {payroll.status === 'PARTIAL_PAID' && (
+              ) : (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
-                  <DollarSign className="h-2.5 w-2.5" />
+                  <AlertCircle className="h-2.5 w-2.5" />
                   Thanh toán 1 phần
                 </span>
               )}
+              {payroll.revisionNo && payroll.revisionNo > 1 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                  <Clock className="h-2.5 w-2.5" />
+                  v{payroll.revisionNo}
+                </span>
+              )}
             </div>
-            <h5 className="text-sm font-semibold text-slate-800">
+            <h5 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-slate-400" />
               {payroll.teacherName}
             </h5>
           </div>
         </div>
 
         <div className="sm:text-right">
-          {/* 🔥 Hiển thị tổng lương */}
-          <p className="text-lg font-semibold text-emerald-600">
+          {/* 🔥 Tổng lương */}
+          <p className={`text-lg font-semibold ${isPartial ? 'text-amber-600' : 'text-emerald-600'}`}>
             {formatCurrency(payroll.amount)}đ
           </p>
-
-          {/* 🔥 Hiển thị số tiền đã thanh toán và còn lại */}
-          {payroll.status === 'PARTIAL_PAID' && (
+          
+          {/* 🔥 Hiển thị chi tiết thanh toán cho PARTIAL_PAID */}
+          {isPartial ? (
             <div className="flex flex-col items-end gap-0.5 mt-1">
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="text-slate-400">Đã thanh toán:</span>
@@ -221,62 +239,28 @@ const FinalizedPayrollCard: React.FC<{
                 <span className="text-slate-400">Còn lại:</span>
                 <span className="font-medium text-amber-600">{formatCurrency(remainingAmount)}</span>
               </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                <span className="flex items-center gap-0.5">
+                  <Calendar className="h-3 w-3" />
+                  {payroll.totalSessions} buổi
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <Receipt className="h-3 w-3" />
+                  {formatDate(payroll.paymentDate)}
+                </span>
+              </div>
             </div>
-          )}
-
-          {payroll.status === 'PAID' && (
+          ) : (
             <div className="flex items-center justify-end gap-2 text-[11px] text-slate-400 mt-0.5">
               <span className="flex items-center gap-0.5">
                 <Calendar className="h-3 w-3" />
                 {payroll.totalSessions} buổi
               </span>
               <span className="flex items-center gap-0.5">
-                <Award className="h-3 w-3" />
-                Đã thanh toán
+                <Receipt className="h-3 w-3" />
+                {formatDate(payroll.paymentDate)}
               </span>
             </div>
-          )}
-
-          {payroll.status === 'FINALIZED' && (
-            <div className="flex items-center justify-end gap-2 text-[11px] text-slate-400 mt-0.5">
-              <span className="flex items-center gap-0.5">
-                <Calendar className="h-3 w-3" />
-                {payroll.totalSessions} buổi
-              </span>
-              <span className="flex items-center gap-0.5">
-                <Award className="h-3 w-3" />
-                Đã chốt
-              </span>
-            </div>
-          )}
-
-          {payroll.status === 'PARTIAL_PAID' && (
-            <div className="flex items-center justify-end gap-2 text-[11px] text-slate-400 mt-0.5">
-              <span className="flex items-center gap-0.5">
-                <Calendar className="h-3 w-3" />
-                {payroll.totalSessions} buổi
-              </span>
-              <span className="flex items-center gap-0.5">
-                <Award className="h-3 w-3" />
-                Thanh toán 1 phần
-              </span>
-            </div>
-          )}
-
-          {/* Nút thanh toán - hiển thị khi FINALIZED hoặc PARTIAL_PAID */}
-          {canPay && onPay && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onPay(payroll.paymentId);
-              }}
-              className="mt-1.5 px-3 py-1 rounded-lg text-xs font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-sm hover:shadow-md flex items-center gap-1.5"
-            >
-              <DollarSign className="h-3 w-3" />
-              {payroll.status === 'PARTIAL_PAID' ? 'Thanh toán tiếp' : 'Xác nhận thanh toán'}
-            </motion.button>
           )}
         </div>
       </div>
@@ -285,7 +269,6 @@ const FinalizedPayrollCard: React.FC<{
     </motion.div>
   );
 };
-
 
 // Empty state component
 const EmptyState: React.FC = () => (
@@ -296,73 +279,62 @@ const EmptyState: React.FC = () => (
   >
     <div className="flex justify-center mb-3">
       <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
-        <FileCheck className="h-7 w-7 text-slate-300" />
+        <DollarSign className="h-7 w-7 text-slate-300" />
       </div>
     </div>
-    <h3 className="text-sm font-medium text-slate-700 mb-1">Chưa có bảng lương nào được chốt</h3>
+    <h3 className="text-sm font-medium text-slate-700 mb-1">Chưa có bảng lương nào được thanh toán</h3>
     <p className="text-xs text-slate-400 max-w-sm mx-auto">
-      Khi bảng lương được giáo viên xác nhận và quản trị viên chốt, chúng sẽ xuất hiện tại đây.
+      Khi bảng lương được chốt và xác nhận thanh toán, chúng sẽ xuất hiện tại đây.
     </p>
   </motion.div>
 );
 
-const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigger }) => {
-  const [finalizedPayrolls, setFinalizedPayrolls] = useState<PayrollListItem[]>([]);
+const PayrollPaidTab: React.FC<PayrollPaidTabProps> = ({ refreshTrigger }) => {
+  const [paidPayrolls, setPaidPayrolls] = useState<PayrollListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { setAlert } = useOutletContext<any>();
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPayrollForPayment, setSelectedPayrollForPayment] = useState<any>(null);
+
   const [stats, setStats] = useState({
     totalAmount: 0,
+    totalPaidAmount: 0,
     averageAmount: 0,
     totalTeachers: 0,
-    paidCount: 0,
-    finalizedCount: 0,
+    totalPayrolls: 0,
+    totalSessions: 0,
+    fullyPaidCount: 0,
     partialPaidCount: 0
   });
 
   useEffect(() => {
-    fetchFinalizedPayrolls();
+    fetchPaidPayrolls();
   }, [refreshTrigger]);
 
-  const handleOpenPaymentModal = async (paymentId: number) => {
-    try {
-      const detail = await payrollApi.getPayrollById(paymentId);
-      setSelectedPayrollForPayment(detail);
-      setShowPaymentModal(true);
-    } catch (error) {
-      setAlert?.({
-        type: 'error',
-        message: 'Không thể tải thông tin bảng lương'
-      });
-    }
-  };
-
-
-  const fetchFinalizedPayrolls = async () => {
+  const fetchPaidPayrolls = async () => {
     try {
       setLoading(true);
       const allPayrolls = await payrollApi.getAllPayrolls();
-      // Bao gồm cả PARTIAL_PAID
-      const finalized = allPayrolls.filter(p =>
-        p.status === 'FINALIZED' || p.status === 'PAID' || p.status === 'PARTIAL_PAID'
-      );
-      setFinalizedPayrolls(finalized);
+      const paid = allPayrolls.filter(p => p.status === 'PAID' || p.status === 'PARTIAL_PAID');
+      setPaidPayrolls(paid);
 
-      const totalAmount = finalized.reduce((sum, p) => sum + p.amount, 0);
+      const totalAmount = paid.reduce((sum, p) => sum + p.amount, 0);
+      const totalPaidAmount = paid.reduce((sum, p) => sum + (p.paidAmount || 0), 0);
+      const totalSessions = paid.reduce((sum, p) => sum + p.totalSessions, 0);
+      
       setStats({
         totalAmount,
-        averageAmount: finalized.length > 0 ? totalAmount / finalized.length : 0,
-        totalTeachers: new Set(finalized.map(p => p.teacherId)).size,
-        paidCount: finalized.filter(p => p.status === 'PAID').length,
-        finalizedCount: finalized.filter(p => p.status === 'FINALIZED').length,
-        partialPaidCount: finalized.filter(p => p.status === 'PARTIAL_PAID').length
+        totalPaidAmount,
+        averageAmount: paid.length > 0 ? totalAmount / paid.length : 0,
+        totalTeachers: new Set(paid.map(p => p.teacherId)).size,
+        totalPayrolls: paid.length,
+        totalSessions,
+        fullyPaidCount: paid.filter(p => p.status === 'PAID').length,
+        partialPaidCount: paid.filter(p => p.status === 'PARTIAL_PAID').length
       });
     } catch (error) {
-      console.error('Failed to fetch finalized payrolls:', error);
+      console.error('Failed to fetch paid payrolls:', error);
       setAlert?.({
         type: 'error',
-        message: 'Không thể tải dữ liệu đã chốt'
+        message: 'Không thể tải dữ liệu đã thanh toán'
       });
     } finally {
       setLoading(false);
@@ -374,7 +346,7 @@ const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigge
   };
 
   if (loading) {
-    return <FinalizedSkeleton />;
+    return <PaidSkeleton />;
   }
 
   const totalInMillions = (stats.totalAmount / 1000000).toFixed(0);
@@ -390,20 +362,27 @@ const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigge
       {/* Header */}
       <motion.div variants={cardVariants} custom={0} className="flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
-          <FileCheck className="h-3.5 w-3.5 text-emerald-600" />
+          <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
         </div>
         <div>
-          <h3 className="text-sm font-medium text-slate-700">Bảng lương đã chốt</h3>
-          <p className="text-[10px] text-slate-400">Danh sách các bảng lương đã được xác nhận và chốt</p>
+          <h3 className="text-sm font-medium text-slate-700">Bảng lương đã thanh toán</h3>
+          <p className="text-[10px] text-slate-400">
+            Danh sách các bảng lương đã được thanh toán
+            {stats.partialPaidCount > 0 && (
+              <span className="text-amber-500 ml-1">
+                ({stats.partialPaidCount} bảng thanh toán 1 phần)
+              </span>
+            )}
+          </p>
         </div>
       </motion.div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KPICard
-          title="Tổng kỳ lương"
-          value={finalizedPayrolls.length}
-          subtitle="bảng lương"
+          title="Tổng bảng lương"
+          value={stats.totalPayrolls}
+          subtitle={`${stats.fullyPaidCount} đã thanh toán đủ, ${stats.partialPaidCount} thanh toán 1 phần`}
           icon={<FileCheck className="h-4 w-4 text-emerald-600" />}
           color="emerald"
           index={0}
@@ -412,7 +391,7 @@ const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigge
         <KPICard
           title="Tổng chi trả"
           value={`${totalInMillions}M`}
-          subtitle={`≈ ${(stats.totalAmount / 1000000).toFixed(0)}M`}
+          subtitle={`≈ ${formatCurrency(stats.totalAmount)}`}
           icon={<DollarSign className="h-4 w-4 text-blue-600" />}
           color="blue"
           index={1}
@@ -421,59 +400,59 @@ const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigge
         <KPICard
           title="Giáo viên"
           value={stats.totalTeachers}
-          subtitle="người"
+          subtitle="người đã nhận lương"
           icon={<Users className="h-4 w-4 text-purple-600" />}
           color="purple"
           index={2}
         />
 
         <KPICard
-          title="Trung bình/GV"
-          value={`${averageInMillions}M`}
-          subtitle="VNĐ"
-          icon={<TrendingUp className="h-4 w-4 text-amber-600" />}
+          title="Tổng buổi dạy"
+          value={stats.totalSessions}
+          subtitle="buổi đã thanh toán"
+          icon={<Calendar className="h-4 w-4 text-amber-600" />}
           color="amber"
           index={3}
         />
       </div>
 
-      {(stats.finalizedCount > 0 || stats.paidCount > 0 || stats.partialPaidCount > 0) && (
-        <motion.div
-          variants={cardVariants}
-          custom={4}
-          className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100"
-        >
-          <div className="flex items-center gap-1.5">
-            <BarChart3 className="h-3 w-3 text-slate-400" />
-            <span className="text-[10px] text-slate-500">Phân bổ:</span>
+      {/* Quick stats */}
+      <motion.div
+        variants={cardVariants}
+        custom={4}
+        className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100"
+      >
+        <div className="flex items-center gap-1.5">
+          <BarChart3 className="h-3 w-3 text-slate-400" />
+          <span className="text-[10px] text-slate-500">Thống kê:</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[10px] text-slate-500">Trung bình: {averageInMillions}M/bảng</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="text-[10px] text-slate-500">Đã chốt: {stats.finalizedCount}</span>
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            <span className="text-[10px] text-slate-500">{stats.totalTeachers} giáo viên</span>
+          </div>
+          {stats.partialPaidCount > 0 && (
             <div className="flex items-center gap-1">
               <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              <span className="text-[10px] text-slate-500">Thanh toán 1 phần: {stats.partialPaidCount}</span>
+              <span className="text-[10px] text-slate-500">{stats.partialPaidCount} bảng thanh toán 1 phần</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-              <span className="text-[10px] text-slate-500">Đã thanh toán: {stats.paidCount}</span>
-            </div>
-          </div>
-        </motion.div>
-      )}
+          )}
+        </div>
+      </motion.div>
 
-      {/* Finalized Payrolls List */}
+      {/* Paid Payrolls List */}
       <div className="space-y-2">
         <AnimatePresence>
-          {finalizedPayrolls.length > 0 ? (
-            finalizedPayrolls.map((payroll, idx) => (
-              <FinalizedPayrollCard
+          {paidPayrolls.length > 0 ? (
+            paidPayrolls.map((payroll, idx) => (
+              <PaidPayrollCard
                 key={payroll.paymentId}
                 payroll={payroll}
                 index={idx}
-                onPay={handleOpenPaymentModal}
               />
             ))
           ) : (
@@ -483,28 +462,26 @@ const PayrollFinalizedTab: React.FC<PayrollFinalizedTabProps> = ({ refreshTrigge
       </div>
 
       {/* Footer insight */}
-      {finalizedPayrolls.length > 0 && (
+      {paidPayrolls.length > 0 && (
         <motion.div
           variants={cardVariants}
-          custom={finalizedPayrolls.length}
+          custom={paidPayrolls.length}
           className="flex items-center justify-center gap-1.5 py-2 text-[10px] text-slate-400 border-t border-slate-100 mt-2"
         >
-          <Sparkles className="h-3 w-3" />
-          <span>Tổng giá trị: {totalInMillions} triệu VNĐ</span>
+          <Sparkles className="h-3 w-3 text-emerald-500" />
+          <span>Tổng giá trị đã thanh toán: {totalInMillions} triệu VNĐ</span>
+          <span className="mx-1">•</span>
+          <span>{paidPayrolls.length} bảng lương</span>
+          {stats.partialPaidCount > 0 && (
+            <>
+              <span className="mx-1">•</span>
+              <span className="text-amber-500">{stats.partialPaidCount} bảng thanh toán 1 phần</span>
+            </>
+          )}
         </motion.div>
       )}
-      {/* 🆕 THÊM PAYMENT MODAL VÀO ĐÂY */}
-      <PaymentModal
-        visible={showPaymentModal}
-        payroll={selectedPayrollForPayment}
-        onClose={() => {
-          setShowPaymentModal(false);
-          setSelectedPayrollForPayment(null);
-        }}
-        onSuccess={fetchFinalizedPayrolls}
-      />
     </motion.div>
   );
 };
 
-export default PayrollFinalizedTab;
+export default PayrollPaidTab;

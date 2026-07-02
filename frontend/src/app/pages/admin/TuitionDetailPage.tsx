@@ -1,32 +1,9 @@
 // src/app/pages/admin/TuitionDetailPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import {
-  Printer,
-  FileText,
-  CreditCard,
-  TrendingUp,
-  Calendar,
-  Clock,
-  History,
-  MessageCircle,
-  X,
-  Trash2,
-  PlusCircle,
-  Landmark,
-  AlertCircle,
-  User,
-  Loader2,
-  CheckCircle,
-  ArrowLeft,
-  Download,
-  Share2,
-  MoreVertical,
-  Receipt,
-  BookOpen,
-  Users,
-  DollarSign,
-  Award,
+  Printer, FileText, CreditCard, TrendingUp, Calendar, Clock, History, MessageCircle,
+  X, Trash2, PlusCircle, Landmark, AlertCircle, User, Loader2, CheckCircle, ArrowLeft, Download, Share2, MoreVertical, Receipt, BookOpen, Users, DollarSign, Award, CheckSquare, Square,
 } from 'lucide-react';
 import { ProtectedRoute } from '../../routes/ProtectedRoute';
 import { tuitionApi } from '../../utils/api/tuition.api';
@@ -60,6 +37,10 @@ interface TuitionItem {
   unitPrice: number;
   total: number;
   discount?: number;
+  billingType: 'per_session' | 'fixed';
+  paidAmount?: number;
+  remainingAmount?: number;
+  isFullyPaid?: boolean;
 }
 
 interface Transaction {
@@ -80,6 +61,9 @@ export const TuitionDetailPage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+
+  const {setAlert} = useOutletContext<any>();
 
   useEffect(() => {
     if (id) {
@@ -97,10 +81,8 @@ export const TuitionDetailPage: React.FC = () => {
       const month = parseInt(params.get('month') || new Date().getMonth().toString());
       const year = parseInt(params.get('year') || new Date().getFullYear().toString());
 
-      console.log('📤 Fetching detail for:', { studentId, month, year });
 
       const response = await tuitionApi.getTuitionDetail(studentId, month, year);
-      console.log('📊 API Response:', response);
 
       if (!response) {
         setError(`Không tìm thấy học phí của học sinh ID ${studentId} trong tháng ${month}/${year}`);
@@ -122,24 +104,36 @@ export const TuitionDetailPage: React.FC = () => {
         courses: response.details?.length || 0,
         attendance: 94,
         totalHours: calculateTotalHours(response.details),
-        scholarship: response.details?.reduce((sum, d) => sum + (d.totalMoney || 0) * 0.2, 0) || 0,
-        items: response.details?.map((d, index) => ({
-          id: d.id || index,
-          name: d.subject?.name || d.subjectName || `Môn học ${index + 1}`,
-          code: d.subject?.id?.toString() || d.subjectCode || '',
-          teacher: d.teacher || '',
-          sessions: d.attendedSessions || d.sessions || 0,
-          unitPrice: d.unitPrice || (d.totalMoney || 0) / (d.attendedSessions || 1),
-          total: d.totalMoney || d.amount || 0,
-          discount: d.discount || 0,
-        })) || [],
+        scholarship: 0,
+        items: response.details?.map((d, index) => {
+          const sessions = d.attendedSessions || d.sessions || 0;
+          const billingType = sessions > 0 ? 'per_session' : 'fixed';
+          const total = d.totalMoney || d.amount || 0;
+          const paidAmount = d.paidAmount || 0;
+
+          return {
+            id: d.id || index,
+            name: d.subject?.name || d.subjectName || `Môn học ${index + 1}`,
+            code: d.subject?.id?.toString() || d.subjectCode || '',
+            teacher: d.teacher || '',
+            sessions: sessions,
+            unitPrice: d.unitPrice || (total) / (sessions || 1),
+            total: total,
+            discount: d.discount || 0,
+            billingType,
+            paidAmount: paidAmount,
+            remainingAmount: total - paidAmount,
+            isFullyPaid: paidAmount >= total,
+          };
+        }) || [],
         transactions: []
       };
 
       setData(transformedData);
+      setSelectedItems(new Set());
 
     } catch (err) {
-      console.error('❌ Failed to fetch tuition detail:', err);
+      console.error('Failed to fetch tuition detail:', err);
       setError('Không thể tải thông tin học phí. Vui lòng thử lại!');
     } finally {
       setLoading(false);
@@ -180,17 +174,71 @@ export const TuitionDetailPage: React.FC = () => {
     }
   };
 
+  const getBillingTypeLabel = (type: string) => {
+    switch (type) {
+      case 'per_session':
+        return { label: 'Theo buổi', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'fixed':
+        return { label: 'Theo môn', className: 'bg-purple-50 text-purple-700 border-purple-200' };
+      default:
+        return { label: 'Cố định', className: 'bg-gray-50 text-gray-700 border-gray-200' };
+    }
+  };
+
+  const toggleItemSelection = (itemId: number) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId);
+    } else {
+      newSelected.add(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const toggleAllItems = () => {
+    if (!data) return;
+    const unpaidItems = data.items.filter(item => !item.isFullyPaid);
+    if (selectedItems.size === unpaidItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(unpaidItems.map(item => item.id)));
+    }
+  };
+
+  const getSelectedTotal = () => {
+    if (!data) return 0;
+    return data.items
+      .filter(item => selectedItems.has(item.id))
+      .reduce((sum, item) => sum + (item.remainingAmount || 0), 0);
+  };
+
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data) return;
 
-    const amount = parseInt(paymentAmount.replace(/\D/g, ''));
-    if (amount <= 0) {
-      alert('Vui lòng nhập số tiền thanh toán!');
-      return;
+    let amount = parseInt(paymentAmount.replace(/\D/g, ''));
+
+    // Nếu chọn thanh toán theo môn và có chọn môn
+    if (selectedItems.size > 0) {
+      const selectedTotal = getSelectedTotal();
+      if (amount === 0) {
+        amount = selectedTotal;
+      } else if (amount > selectedTotal) {
+        alert(`Số tiền không được vượt quá tổng số tiền của các môn đã chọn (${formatCurrency(selectedTotal)})`);
+        return;
+      }
+    } else {
+      // Thanh toán toàn bộ
+      if (amount === 0) {
+        amount = data.remainingAmount;
+      } else if (amount > data.remainingAmount) {
+        alert(`Số tiền không được vượt quá số dư nợ (${formatCurrency(data.remainingAmount)})`);
+        return;
+      }
     }
-    if (amount > data.remainingAmount) {
-      alert(`Số tiền không được vượt quá số dư nợ (${formatCurrency(data.remainingAmount)})`);
+
+    if (amount <= 0) {
+      alert('Vui lòng nhập số tiền thanh toán hoặc chọn môn học!');
       return;
     }
 
@@ -200,11 +248,17 @@ export const TuitionDetailPage: React.FC = () => {
     try {
       await tuitionApi.payTuition(data.id, amount);
       await fetchTuitionDetail();
-      alert(`✅ Thanh toán thành công ${formatCurrency(amount)}!`);
+      setAlert?.({
+        type: 'success',
+        message: `Thanh toán thành công ${formatCurrency(amount)}!`
+      });
       setPaymentAmount('');
+      setSelectedItems(new Set());
     } catch (err) {
-      console.error('Payment failed:', err);
-      alert('❌ Thanh toán thất bại. Vui lòng thử lại!');
+       setAlert?.({
+        type: 'error',
+        message: `Thanh toán thất bại. Vui lòng thử lại!`
+      });
     } finally {
       setShowLoadingOverlay(false);
     }
@@ -249,15 +303,15 @@ export const TuitionDetailPage: React.FC = () => {
   }
 
   const statusBadge = getStatusBadge(data.status);
-  const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
-  const totalAfterDiscount = subtotal - data.scholarship;
+  const totalAmount = data.items.reduce((sum, item) => sum + item.total, 0);
   const paymentProgress = data.totalTuition > 0 ? (data.paidAmount / data.totalTuition) * 100 : 0;
+  const unpaidItems = data.items.filter(item => !item.isFullyPaid);
+  const selectedTotal = getSelectedTotal();
 
   return (
     <ProtectedRoute allowedRoles={['R0']}>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6 sm:space-y-8">
-          
 
           {/* Header Section */}
           <header className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-300">
@@ -288,27 +342,24 @@ export const TuitionDetailPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 text-sm text-slate-500">
-                    <span className="font-medium">{data.studentCode}</span>
                     <span className="w-1 h-1 rounded-full bg-slate-300"></span>
                     <span>Lớp {data.grade}</span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                
                 {data.status !== 'PAID' && (
                   <button
                     onClick={() => {
-                      setPaymentAmount(data.remainingAmount.toString());
+                      setPaymentAmount('');
                       setShowPaymentModal(true);
                     }}
                     className="flex-1 md:flex-none px-6 py-2.5 btn-gradient text-white rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 hover:shadow-xl hover:shadow-indigo-600/30"
                   >
                     <CreditCard className="w-4 h-4" />
-                    Thanh toán ngay
+                    Thanh toán
                   </button>
                 )}
-               
               </div>
             </div>
           </header>
@@ -325,10 +376,6 @@ export const TuitionDetailPage: React.FC = () => {
                   <Landmark className="w-6 h-6 text-indigo-600" />
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 font-medium">
-                <TrendingUp className="w-3.5 h-3.5" />
-                +5% so với kỳ trước
-              </div>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -343,8 +390,8 @@ export const TuitionDetailPage: React.FC = () => {
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000" 
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000"
                     style={{ width: `${Math.min(paymentProgress, 100)}%` }}
                   ></div>
                 </div>
@@ -364,10 +411,7 @@ export const TuitionDetailPage: React.FC = () => {
                   <DollarSign className="w-6 h-6 text-amber-600" />
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Hạn chót: <span className="font-medium text-slate-700">{data.dueDate}</span></span>
-              </div>
+              
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -398,49 +442,104 @@ export const TuitionDetailPage: React.FC = () => {
                       <Receipt className="w-5 h-5 text-indigo-600" />
                       Chi tiết học phần
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Học kỳ 1 - Năm học 2023-2024</p>
+                    
                   </div>
-                  <span className="text-xs font-medium text-slate-400 bg-white px-3 py-1 rounded-lg border border-slate-200">
-                    {data.items.length} môn học
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-400 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                      {data.items.length} môn học
+                    </span>
+                    {unpaidItems.length > 0 && (
+                      <button
+                        onClick={toggleAllItems}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 font-medium px-3 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                      >
+                        {selectedItems.size === unpaidItems.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
                       <tr className="bg-slate-50/80 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
+                        <th className="px-6 py-4 font-semibold w-10"></th>
                         <th className="px-6 py-4 font-semibold">Môn học / Nội dung</th>
+                        <th className="px-6 py-4 font-semibold text-center">Loại hình</th>
                         <th className="px-6 py-4 font-semibold text-center">Số buổi</th>
                         <th className="px-6 py-4 font-semibold text-right">Đơn giá</th>
                         <th className="px-6 py-4 font-semibold text-right">Thành tiền</th>
+                        <th className="px-6 py-4 font-semibold text-right">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {data.items.map((item, index) => (
-                        <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors duration-150">
-                          <td className="px-6 py-4">
-                            <div className="font-semibold text-slate-900">{item.name}</div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                              <span>Mã: {item.code}</span>
-                              {item.teacher && (
-                                <>
-                                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                  <span>GV: {item.teacher}</span>
-                                </>
+                      {data.items.map((item) => {
+                        const billingInfo = getBillingTypeLabel(item.billingType);
+                        const isSelected = selectedItems.has(item.id);
+                        const isPaid = item.isFullyPaid;
+
+                        return (
+                          <tr key={item.id} className={`hover:bg-indigo-50/30 transition-colors duration-150 ${isPaid ? 'bg-emerald-50/30' : ''}`}>
+                            <td className="px-6 py-4">
+                              {!isPaid && (
+                                <button
+                                  onClick={() => toggleItemSelection(item.id)}
+                                  className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare className="w-5 h-5 text-indigo-600" />
+                                  ) : (
+                                    <Square className="w-5 h-5" />
+                                  )}
+                                </button>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center font-medium text-slate-700">{item.sessions}</td>
-                          <td className="px-6 py-4 text-right font-medium text-slate-700">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-6 py-4 text-right font-bold text-slate-900">{formatCurrency(item.total)}</td>
-                        </tr>
-                      ))}
+                              {isPaid && (
+                                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-semibold text-slate-900">{item.name}</div>
+                             
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${billingInfo.className}`}>
+                                {billingInfo.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center font-medium text-slate-700">
+                              {item.billingType === 'fixed' ? '-' : item.sessions}
+                            </td>
+                            <td className="px-6 py-4 text-right font-medium text-slate-700">
+                              {formatCurrency(item.unitPrice)}
+                            </td>
+                            <td className="px-6 py-4 text-right font-bold text-slate-900">
+                              {formatCurrency(item.total)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  Đã đủ
+                                </span>
+                              ) : (
+                                <div className="text-xs">
+                                  <div className="font-medium text-amber-600">
+                                    {formatCurrency(item.remainingAmount || 0)}
+                                  </div>
+                                  <div className="text-slate-400">
+                                    còn lại
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-slate-50/50 border-t border-slate-100">
-                      
                       <tr className="border-t-2 border-slate-200 bg-gradient-to-r from-indigo-50/30 to-purple-50/30">
-                        <td className="px-6 py-5 text-right font-bold text-lg text-slate-900" colSpan={3}>Tổng cộng:</td>
-                        <td className="px-6 py-5 text-right font-bold text-2xl gradient-text">
-                          {formatCurrency(totalAfterDiscount)}
+                        <td className="px-6 py-5 text-right font-bold text-lg text-slate-900" colSpan={5}>Tổng cộng:</td>
+                        <td className="px-6 py-5 text-right font-bold text-2xl gradient-text" colSpan={2}>
+                          {formatCurrency(totalAmount)}
                         </td>
                       </tr>
                     </tfoot>
@@ -472,12 +571,15 @@ export const TuitionDetailPage: React.FC = () => {
                     </div>
                     <span className="font-bold text-slate-900">{data.items.reduce((sum, item) => sum + item.sessions, 0)}</span>
                   </div>
+                 
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <Users className="w-4 h-4 text-blue-500" />
-                      <span>Giáo viên</span>
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                      <span>Đã thanh toán đủ</span>
                     </div>
-                    <span className="font-bold text-slate-900">{new Set(data.items.map(item => item.teacher).filter(Boolean)).size}</span>
+                    <span className="font-bold text-emerald-600">
+                      {data.items.filter(item => item.isFullyPaid).length}/{data.items.length}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -497,8 +599,14 @@ export const TuitionDetailPage: React.FC = () => {
                     <span className="text-slate-500">Còn lại</span>
                     <span className="font-semibold text-amber-600">{formatCurrency(data.remainingAmount)}</span>
                   </div>
+                  {selectedItems.size > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-indigo-50 p-2 rounded-lg">
+                      <span className="text-indigo-600 font-medium">Đã chọn ({selectedItems.size} môn)</span>
+                      <span className="font-bold text-indigo-700">{formatCurrency(selectedTotal)}</span>
+                    </div>
+                  )}
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mt-1">
-                    <div 
+                    <div
                       className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000"
                       style={{ width: `${Math.min(paymentProgress, 100)}%` }}
                     ></div>
@@ -545,18 +653,29 @@ export const TuitionDetailPage: React.FC = () => {
                     <span className="text-slate-500">Số tiền còn lại:</span>
                     <span className="font-bold text-amber-600">{formatCurrency(data.remainingAmount)}</span>
                   </div>
+                  {selectedItems.size > 0 && (
+                    <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                      <span className="text-indigo-600">Đã chọn {selectedItems.size} môn:</span>
+                      <span className="font-bold text-indigo-700">{formatCurrency(selectedTotal)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Amount Input */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Số tiền thanh toán
+                    {selectedItems.size > 0 && (
+                      <span className="text-xs font-normal text-slate-500 ml-2">
+                        (Tối đa: {formatCurrency(selectedTotal)})
+                      </span>
+                    )}
                   </label>
                   <div className="relative">
                     <input
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                       type="text"
-                      value={new Intl.NumberFormat('vi-VN').format(parseInt(paymentAmount.replace(/\D/g, '')) || 0)}
+                      value={paymentAmount ? new Intl.NumberFormat('vi-VN').format(parseInt(paymentAmount.replace(/\D/g, '')) || 0) : ''}
                       onChange={(e) => {
                         const value = e.target.value.replace(/\D/g, '');
                         setPaymentAmount(value);
@@ -568,15 +687,25 @@ export const TuitionDetailPage: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between mt-2.5">
                     <p className="text-xs text-amber-600 font-medium">
-                      * Tối đa: {formatCurrency(data.remainingAmount)}
+                      * Để trống để thanh toán toàn bộ
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentAmount(data.remainingAmount.toString())}
-                      className="text-xs text-indigo-600 font-semibold hover:text-indigo-700 transition-colors"
-                    >
-                      Thanh toán toàn bộ
-                    </button>
+                    {selectedItems.size > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAmount(selectedTotal.toString())}
+                        className="text-xs text-indigo-600 font-semibold hover:text-indigo-700 transition-colors"
+                      >
+                        Thanh toán các môn đã chọn
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAmount(data.remainingAmount.toString())}
+                        className="text-xs text-indigo-600 font-semibold hover:text-indigo-700 transition-colors"
+                      >
+                        Thanh toán toàn bộ
+                      </button>
+                    )}
                   </div>
                 </div>
 

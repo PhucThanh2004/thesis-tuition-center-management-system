@@ -14,13 +14,14 @@ import {
   FileCheck,
   PlusCircle,
   XCircle,
+  DollarSign,
 } from 'lucide-react';
 import type { PayrollFilter } from '../../../utils/types/payroll';
 import './payroll.css';
 
 interface PayrollToolbarProps {
   activeTab: string;
-  onTabChange: (tab: 'preview' | 'list' | 'waiting' | 'finalized' | 'rejected') => void; // ✅ THÊM 'rejected'
+  onTabChange: (tab: 'preview' | 'list' | 'waiting' | 'finalized' | 'rejected' | 'paid') => void;
   filters: PayrollFilter;
   onFilterChange: (filters: Partial<PayrollFilter>) => void;
   onPreviewMonthly?: () => void;
@@ -32,6 +33,7 @@ const tabs = [
   { id: 'waiting', label: 'Chờ xác nhận', icon: Clock, description: 'Cần phản hồi từ GV' },
   { id: 'rejected', label: 'Từ chối', icon: XCircle, description: 'Bảng lương bị từ chối/cần điều chỉnh' },
   { id: 'finalized', label: 'Đã chốt', icon: FileCheck, description: 'Hoàn tất chốt lương' },
+  { id: 'paid', label: 'Đã thanh toán', icon: DollarSign, description: 'Đã thanh toán cho GV' },
   { id: 'preview', label: 'Tạo mới', icon: PlusCircle, description: 'Tạo bảng lương mới' }
 ];
 
@@ -78,12 +80,18 @@ const TabButton: React.FC<{
     if (tab.id === 'rejected') {
       return 'bg-red-50 text-red-600 border-red-200 shadow-sm';
     }
+    if (tab.id === 'paid') {
+      return 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm';
+    }
     return 'bg-primary-fixed text-primary border-primary/10 shadow-sm';
   };
 
   const getHoverClasses = () => {
     if (tab.id === 'rejected') {
       return 'hover:text-red-600 hover:bg-red-50/40';
+    }
+    if (tab.id === 'paid') {
+      return 'hover:text-emerald-600 hover:bg-emerald-50/40';
     }
     return 'hover:text-primary hover:bg-primary-fixed/40';
   };
@@ -94,8 +102,8 @@ const TabButton: React.FC<{
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       className={`relative flex items-center gap-2 px-4 py-2 rounded-lg font-normal text-sm transition-all duration-200 ${isActive
-          ? getActiveClasses()
-          : `text-secondary ${getHoverClasses()} border border-transparent`
+        ? getActiveClasses()
+        : `text-secondary ${getHoverClasses()} border border-transparent`
         }`}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -105,6 +113,7 @@ const TabButton: React.FC<{
         {tab.id === 'waiting' && 'Chờ'}
         {tab.id === 'rejected' && 'Từ chối'}
         {tab.id === 'finalized' && 'Chốt'}
+        {tab.id === 'paid' && 'Đã TT'}
         {tab.id === 'preview' && 'Mới'}
       </span>
       {isActive && (
@@ -265,7 +274,7 @@ const PayrollToolbar: React.FC<PayrollToolbarProps> = ({
                   e.stopPropagation();
                   onPreviewMonthly();
                 }}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg btn-gradient text-xs font-medium"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg btn-gradient text-xs text-white font-medium"
               >
                 <Eye className="h-3.5 w-3.5" />
                 Xem trước tháng

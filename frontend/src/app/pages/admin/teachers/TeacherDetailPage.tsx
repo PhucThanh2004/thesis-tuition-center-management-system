@@ -6,32 +6,33 @@ import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import {
   ArrowLeft,
   Edit,
-  Trash2,
   Mail,
   Phone,
   Verified,
   School,
   Users,
   CheckCircle,
-  Download,
-  FileText,
   GraduationCap,
-  Sparkles,
   HelpCircle,
   AlertCircle,
+  Award,
+  BookOpen,
+  User,
+  Clock,
+  MapPin,
+  Shield,
+  Calendar
 } from 'lucide-react';
 import { teacherApi, buildTeacherFormData } from '../../../utils/api/teacher.api';
 import type { Teacher } from '../../../utils/types/teacher';
 import EditTeacherModal from '../../../components/adminComponents/teachers/EditTeacherModal';
 
-// Helper to get full address
 const getFullAddress = (teacher: Teacher): string => {
   if (!teacher.address) return 'Chưa cập nhật';
   const parts = [teacher.address.details, teacher.address.ward, teacher.address.province].filter(Boolean);
   return parts.join(', ') || 'Chưa cập nhật';
 };
 
-// Helper to get full image URL using Vite environment variables
 const getFullImageUrl = (imagePath: string | null | undefined): string => {
   if (!imagePath) return '';
   if (imagePath.startsWith('http')) return imagePath;
@@ -89,7 +90,7 @@ export function TeacherDetailPage() {
       if (response.errCode === 0) {
         setAlert?.({ type: 'success', message: response.message || 'Cập nhật giáo viên thành công' });
         setIsEditModalOpen(false);
-        await fetchTeacher(); // refresh data
+        await fetchTeacher();
       } else {
         setAlert?.({ type: 'error', message: response.message || 'Cập nhật thất bại' });
       }
@@ -110,335 +111,230 @@ export function TeacherDetailPage() {
     }
   };
 
-  const handleDownload = (doc: any) => console.log('Download:', doc.name);
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4b41e1]" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-200 border-t-purple-600 mx-auto" />
+          <p className="mt-3 text-xs text-slate-400">Đang tải...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !teacher) {
     return (
-      <div className="min-h-screen bg-[#f7f9fb] flex flex-col items-center justify-center">
-        <AlertCircle className="w-16 h-16 text-[#4b41e1] mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">{error || 'Không tìm thấy giáo viên'}</h2>
-        <button
-          onClick={handleBack}
-          className="px-6 py-3 bg-[#4b41e1] text-white rounded-xl font-semibold hover:bg-[#3a32b0] transition-colors"
-        >
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+        </div>
+        <p className="text-sm font-medium text-slate-700 mb-4">{error || 'Không tìm thấy giáo viên'}</p>
+        <button onClick={handleBack} className="px-4 py-2 text-sm font-medium rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-all">
           Quay lại
         </button>
       </div>
     );
   }
 
-  // Additional display fields
   const teacherId = `GV-${teacher.id}`;
   const department = teacher.specialty ? `Khoa ${teacher.specialty}` : 'Chưa phân khoa';
   const statusText = teacher.status ? 'Đang hoạt động' : 'Tạm nghỉ';
-  const statusColor = teacher.status ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+  const statusColor = teacher.status ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200';
   const statusDot = teacher.status ? 'bg-emerald-500' : 'bg-amber-500';
   const genderText = teacher.gender ? 'Nam' : 'Nữ';
   const dateOfBirth = teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật';
-  const experience = 'Chưa cập nhật';
-  const qualifications = 'Chưa cập nhật';
   const specialization = teacher.specialty || 'Chưa cập nhật';
-  const classes: string[] = [];
   const skills: string[] = [teacher.specialty].filter(Boolean);
-  const documents: any[] = [];
-  const totalClasses = 0;
-  const totalStudents = 0;
-  const attendanceRate = 0;
 
   const fullImageUrl = getFullImageUrl(teacher.image);
+  const hasImage = fullImageUrl && !imageError;
+  const initials = teacher.fullName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <>
-      <div className="min-h-screen bg-[#f7f9fb]">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         {/* Header */}
-        <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-8 py-4">
+        <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between">
               <button
                 onClick={handleBack}
-                className="flex items-center gap-2 text-[#4b41e1] hover:text-[#3a32b0] transition-colors font-medium"
+                className="flex items-center gap-1.5 text-purple-600 hover:text-purple-700 transition-colors text-sm font-medium group"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 <span>Quay lại</span>
               </button>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleEdit}
-                  className="flex items-center gap-2 px-6 py-2.5 btn-gradient from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-                >
-                  <Edit className="w-4 h-4" />
-                  <span>Chỉnh sửa</span>
-                </button>
-              </div>
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg btn-gradient from-purple-500 to-purple-600 text-white text-sm font-medium shadow-sm shadow-purple-200 hover:shadow-md transition-all"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Chỉnh sửa</span>
+              </button>
             </div>
           </div>
         </div>
 
-        <main className="max-w-7xl mx-auto px-8 py-8">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-800">Chi tiết giáo viên</h1>
-            <p className="text-gray-500 text-lg mt-1">Thông tin đầy đủ và hồ sơ giảng dạy</p>
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Page Title */}
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold text-slate-800">Chi tiết giáo viên</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Thông tin đầy đủ và hồ sơ giảng dạy</p>
           </div>
 
-          <div className="grid grid-cols-12 gap-8">
-            {/* Left Column */}
-            <div className="col-span-12 lg:col-span-8 space-y-8">
-              {/* Profile Card */}
-              <div className="bg-white rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 shadow-sm border border-slate-100">
-                <div className="relative group">
-                  <div className="h-32 w-32 rounded-2xl overflow-hidden ring-4 ring-purple-100 group-hover:ring-[#4b41e1] transition-all">
-                    {fullImageUrl ? (
+          {/* Profile Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group mb-6">
+            <div className="relative h-20 bg-purple-500 via-purple-600 to-indigo-600">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30" />
+              <div className="absolute -bottom-8 left-6 z-10">
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-xl overflow-hidden ring-4 ring-white shadow-lg transition-transform group-hover:scale-105 duration-300">
+                    {hasImage ? (
                       <img
                         src={fullImageUrl}
                         alt={teacher.fullName}
                         className="w-full h-full object-cover"
                         onError={() => setImageError(true)}
                       />
-                    ) : null}
-                    {(!fullImageUrl || imageError) && (
-                      <div className="w-full h-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
-                        {teacher.fullName.charAt(0)}
+                    ) : (
+                      <div className="w-full h-full btn-gradient from-purple-400 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+                        {initials}
                       </div>
                     )}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-full shadow-md">
-                    <Verified className="w-5 h-5 text-[#4b41e1] fill-current" />
-                  </div>
-                </div>
-                <div className="flex-1 text-center md:text-left">
-                  <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
-                    <h2 className="text-3xl font-bold text-gray-800">{teacher.fullName}</h2>
-                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border ${statusColor}`}>
-                      <span className={`w-2 h-2 rounded-full ${statusDot}`} />
-                      {statusText}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap justify-center md:justify-start gap-6 text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-[#4b41e1]" />
-                      <span>{teacher.email}</span>
-                    </div>
-                    {teacher.phoneNumber && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-[#4b41e1]" />
-                        <span>{teacher.phoneNumber}</span>
-                      </div>
-                    )}
+                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 ring-2 ring-white">
+                    <Verified className="w-3 h-3 text-white fill-current" />
                   </div>
                 </div>
               </div>
-
-              {/* Basic Information */}
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-                  <div className="w-1.5 h-6 bg-[#4b41e1] rounded-full" />
-                  Thông tin cơ bản
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Mã giáo viên</p>
-                    <p className="text-lg font-semibold text-gray-800">{teacherId}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Giới tính</p>
-                    <p className="text-lg font-semibold text-gray-800">{genderText}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Ngày sinh</p>
-                    <p className="text-lg font-semibold text-gray-800">{dateOfBirth}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Khoa</p>
-                    <p className="text-lg font-semibold text-gray-800">{department}</p>
-                  </div>
-                  <div className="col-span-full">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Địa chỉ</p>
-                    <p className="text-lg font-semibold text-gray-800">{getFullAddress(teacher)}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Professional Information */}
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-                  <div className="w-1.5 h-6 bg-[#4b41e1] rounded-full" />
-                  Thông tin chuyên môn
-                </h3>
-                <div className="space-y-8">
-                  <div>
-                    <div className="flex justify-between items-end mb-3">
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Kinh nghiệm</p>
-                        <p className="text-lg font-semibold">{experience}</p>
-                      </div>
-                      <span className="text-sm font-bold text-[#4b41e1]">Chưa xác định</span>
-                    </div>
-                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-600 rounded-full" style={{ width: '0%' }} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-5 bg-[#f7f9fb] rounded-xl border border-slate-200">
-                      <GraduationCap className="w-6 h-6 text-[#4b41e1] mb-3" />
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Trình độ học vấn</p>
-                      <p className="font-semibold">{qualifications}</p>
-                    </div>
-                    <div className="p-5 bg-[#f7f9fb] rounded-xl border border-slate-200">
-                      <Sparkles className="w-6 h-6 text-[#4b41e1] mb-3" />
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Chuyên ngành</p>
-                      <p className="font-semibold">{specialization}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Lớp đang giảng dạy</p>
-                    <div className="flex flex-wrap gap-2">
-                      {classes.length === 0 && <span className="text-gray-500 text-sm">Chưa có lớp</span>}
-                      {classes.map((cls, idx) => (
-                        <div key={idx} className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-semibold flex items-center gap-2 border border-purple-200">
-                          <Users className="w-4 h-4" />
-                          {cls}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Skills */}
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-3">
-                  <div className="w-1.5 h-6 bg-[#4b41e1] rounded-full" />
-                  Kỹ năng & Phân loại
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {skills.map((skill, idx) => (
-                    <span key={idx} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
-                      {skill}
-                    </span>
-                  ))}
-                  {skills.length === 0 && <span className="text-gray-500 text-sm">Chưa có kỹ năng</span>}
-                </div>
-              </div>
-
-              {/* Documents */}
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-3">
-                  <div className="w-1.5 h-6 bg-[#4b41e1] rounded-full" />
-                  Tài liệu đính kèm
-                </h3>
-                {documents.length === 0 ? (
-                  <p className="text-gray-500 text-sm">Chưa có tài liệu nào</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 bg-[#f7f9fb] rounded-xl group hover:bg-purple-50 cursor-pointer" onClick={() => handleDownload(doc)}>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-white p-2 rounded-lg shadow-sm text-[#4b41e1] group-hover:bg-[#4b41e1] group-hover:text-white transition-colors">
-                            <FileText className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">{doc.name}</p>
-                            <p className="text-xs text-gray-400">{doc.size}</p>
-                          </div>
-                        </div>
-                        <Download className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="absolute top-3 right-6 text-white/20">
+                <Shield className="w-6 h-6" />
               </div>
             </div>
 
-            {/* Right Column */}
-            <div className="col-span-12 lg:col-span-4 space-y-6">
-              {/* Quick Summary Card */}
-              <div className="bg-purple-600 from-purple-600 to-indigo-600 text-white rounded-3xl p-8 shadow-xl shadow-purple-200 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                  <Users className="w-32 h-32" />
+            <div className="pt-10 pb-4 px-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-800">{teacher.fullName}</h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusColor}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                      {statusText}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-200">
+                      <School className="w-3 h-3" />
+                      {department}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold mb-6 relative z-10">Tóm tắt hoạt động</h3>
-                <div className="space-y-6 relative z-10">
-                  <div className="flex items-center justify-between border-b border-white/20 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white/20 p-2 rounded-xl">
-                        <School className="w-5 h-5" />
-                      </div>
-                      <span className="font-medium">Tổng số lớp</span>
-                    </div>
-                    <span className="text-2xl font-black">{totalClasses}</span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/20 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white/20 p-2 rounded-xl">
-                        <Users className="w-5 h-5" />
-                      </div>
-                      <span className="font-medium">Tổng học sinh</span>
-                    </div>
-                    <span className="text-2xl font-black">{totalStudents}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white/20 p-2 rounded-xl">
-                        <CheckCircle className="w-5 h-5" />
-                      </div>
-                      <span className="font-medium">Tỉ lệ chuyên cần</span>
-                    </div>
-                    <span className="text-2xl font-black">{attendanceRate}%</span>
-                  </div>
+                <div className="flex items-center gap-2">
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Recent Activities */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <div className="w-1 h-5 bg-[#4b41e1] rounded-full" />
-                  Hoạt động gần đây
-                </h3>
-                <div className="space-y-4">
-                  <div className="relative pl-8">
-                    <div className="absolute left-0 top-1.5 w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-purple-600 rounded-full" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-800">Chưa có hoạt động</p>
-                      <p className="text-xs text-gray-400 mt-0.5">--</p>
-                    </div>
-                  </div>
+          {/* Two Column Info Cards - Full width info */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Basic Information - Now includes email, phone, address, DOB */}
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <div className="p-1.5 rounded-lg bg-purple-100">
+                  <User className="w-4 h-4 text-purple-600" />
                 </div>
-                <button className="w-full mt-4 py-2 text-sm font-semibold text-[#4b41e1] hover:bg-purple-50 rounded-lg transition-colors">
-                  Xem toàn bộ lịch sử
-                </button>
+                <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">Thông tin cơ bản</h3>
               </div>
-
-              {/* Help & Support */}
-              <div className="bg-[#f7f9fb] rounded-2xl p-6 border border-dashed border-slate-300">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-                    <HelpCircle className="w-5 h-5 text-[#4b41e1]" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Mã GV</p>
                   </div>
-                  <div>
-                    <p className="font-bold">Cần hỗ trợ?</p>
-                    <p className="text-xs text-gray-500">Liên hệ bộ phận quản lý nhân sự</p>
+                  <span className="text-sm font-medium text-slate-700">{teacherId}</span>
+                </div>
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Giới tính</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{genderText}</span>
+                </div>
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Ngày sinh</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{dateOfBirth}</span>
+                </div>
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Email</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700 truncate">{teacher.email}</span>
+                </div>
+                {teacher.phoneNumber && (
+                  <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                    <div className="w-20 flex-shrink-0">
+                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">SĐT</p>
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">{teacher.phoneNumber}</span>
+                  </div>
+                )}
+                <div className="flex items-start gap-3 py-1.5">
+                  <div className="w-20 flex-shrink-0 pt-0.5">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Địa chỉ</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{getFullAddress(teacher)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Professional Information */}
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <div className="p-1.5 rounded-lg bg-emerald-100">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                </div>
+                <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">Chuyên môn</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Khoa</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{department}</span>
+                </div>
+                <div className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                  <div className="w-20 flex-shrink-0">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Chuyên ngành</p>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{specialization}</span>
+                </div>
+                <div className="py-1.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-20 flex-shrink-0">
+                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Kỹ năng</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skills.length > 0 ? (
+                        skills.map((skill, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-purple-50 text-purple-600 rounded-full text-[10px] font-medium">
+                            {skill}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-slate-400">Chưa có kỹ năng</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <button className="w-full py-2.5 bg-white border border-slate-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-purple-50 hover:border-purple-200 transition-all">
-                  Gửi yêu cầu hỗ trợ
-                </button>
               </div>
             </div>
           </div>
         </main>
       </div>
 
-      {/* Edit Teacher Modal */}
       <EditTeacherModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}

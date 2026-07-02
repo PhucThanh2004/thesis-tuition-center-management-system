@@ -13,12 +13,14 @@ import {
   Clock,
   TrendingUp,
   XCircle,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import type { PayrollFilter, PayrollListItem, TeacherPaymentStatus, TeacherPayrollRejectRequest, TeacherPaymentResponse } from '../../../utils/types/payroll';
 import { payrollApi } from '../../../utils/api/payroll.api';
 import './payroll.css';
 import { useOutletContext } from 'react-router-dom';
+import PaymentModal from './PaymentModal';
 
 interface PayrollListTabProps {
   filters: PayrollFilter;
@@ -60,12 +62,12 @@ const StatusBadge: React.FC<{ status: TeacherPaymentStatus }> = ({ status }) => 
       label: 'ĐÃ XÁC NHẬN',
       icon: <CheckCircle className="h-2.5 w-2.5" />
     },
-    'REJECTED': {  // THÊM MỚI
+    'REJECTED': {
       class: 'bg-red-50 text-red-600 border-red-200',
       label: 'TỪ CHỐI',
       icon: <XCircle className="h-2.5 w-2.5" />
     },
-    'REQUEST_ADJUSTMENT': {  // THÊM MỚI
+    'REQUEST_ADJUSTMENT': {
       class: 'bg-amber-50 text-amber-700 border-amber-200',
       label: 'YÊU CẦU ĐIỀU CHỈNH',
       icon: <Clock className="h-2.5 w-2.5" />
@@ -74,6 +76,11 @@ const StatusBadge: React.FC<{ status: TeacherPaymentStatus }> = ({ status }) => 
       class: 'bg-purple-50 text-purple-600 border-purple-200',
       label: 'ĐÃ CHỐT',
       icon: <Lock className="h-2.5 w-2.5" />
+    },
+    'PARTIAL_PAID': {
+      class: 'bg-amber-50 text-amber-600 border-amber-200',
+      label: 'THANH TOÁN 1 PHẦN',
+      icon: <DollarSign className="h-2.5 w-2.5" />
     },
     'PAID': {
       class: 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -119,7 +126,7 @@ const TableSkeleton: React.FC = () => (
 );
 
 // Empty state
-const EmptyState: React.FC<{ role: string }> = ({ role }) => (
+const EmptyState: React.FC = () => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
@@ -132,9 +139,7 @@ const EmptyState: React.FC<{ role: string }> = ({ role }) => (
     </div>
     <h3 className="text-sm font-medium text-slate-700 mb-1">Không có bảng lương nào</h3>
     <p className="text-xs text-slate-400 max-w-sm mx-auto">
-      {role === 'ADMIN'
-        ? 'Chưa có bảng lương nào được tạo trong kỳ này'
-        : 'Bạn chưa có bảng lương nào trong kỳ này'}
+      Chưa có bảng lương nào được tạo trong kỳ này
     </p>
   </motion.div>
 );
@@ -145,26 +150,16 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
   const [selectedPayroll, setSelectedPayroll] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPayrollForPayment, setSelectedPayrollForPayment] = useState<any>(null);
   const { setAlert } = useOutletContext<any>();
-  const [currentUser, setCurrentUser] = useState<{ id: number; role: string }>({
-    id: 0,
-    role: ''
-  });
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setCurrentUser({
-          id: user.id,
-          role: user.role || 'ADMIN'
-        });
-      } catch (e) {
-        console.error('Failed to parse user:', e);
-      }
-    }
-  }, []);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmData, setConfirmData] = useState<{
+    paymentId: number;
+    teacherName: string;
+    month: number;
+    year: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchPayrolls();
@@ -189,10 +184,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
         filteredPayrolls = filteredPayrolls.filter(p =>
           p.teacherName.toLowerCase().includes(filters.teacherName!.toLowerCase())
         );
-      }
-
-      if (currentUser.role === 'TEACHER' && currentUser.id) {
-        filteredPayrolls = filteredPayrolls.filter(p => p.teacherId === currentUser.id);
       }
 
       setPayrolls(filteredPayrolls);
@@ -220,15 +211,20 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
     }
   };
 
-  const handleConfirm = async (paymentId: number) => {
-    if (currentUser.role !== 'TEACHER') {
+  const handleOpenPaymentModal = async (paymentId: number) => {
+    try {
+      const detail = await payrollApi.getPayrollById(paymentId);
+      setSelectedPayrollForPayment(detail);
+      setShowPaymentModal(true);
+    } catch (error) {
       setAlert?.({
         type: 'error',
-        message: 'Chỉ giáo viên mới có thể xác nhận bảng lương'
+        message: 'Không thể tải thông tin bảng lương'
       });
-      return;
     }
+  };
 
+  const handleConfirm = async (paymentId: number) => {
     setActionLoading(paymentId);
     try {
       await payrollApi.confirmPayroll({
@@ -238,7 +234,8 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       setAlert?.({
         type: 'success',
         message: 'Xác nhận bảng lương thành công'
-      }); await fetchPayrolls();
+      });
+      await fetchPayrolls();
     } catch (error) {
       setAlert?.({
         type: 'error',
@@ -250,17 +247,8 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
   };
 
   const handleReject = async (paymentId: number) => {
-    if (currentUser.role !== 'TEACHER') {
-      setAlert?.({
-        type: 'error',
-        message: 'Chỉ giáo viên mới có thể từ chối bảng lương'
-      });
-      return;
-    }
-
-    // Hiển thị prompt để nhập lý do từ chối
     const reason = window.prompt('Vui lòng nhập lý do từ chối bảng lương:');
-    if (reason === null) return; // User cancel
+    if (reason === null) return;
     if (!reason.trim()) {
       setAlert?.({
         type: 'error',
@@ -293,15 +281,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
   };
 
   const handleRegenerate = async (paymentId: number) => {
-    if (currentUser.role !== 'ADMIN') {
-      setAlert?.({
-        type: 'error',
-        message: 'Chỉ quản trị viên mới có thể tái tạo bảng lương'
-      });
-      return;
-    }
-
-    // Tìm payroll để lấy teacherId, month, year
     const payroll = payrolls.find(p => p.paymentId === paymentId);
     if (!payroll) {
       setAlert?.({
@@ -311,17 +290,27 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       return;
     }
 
-    // Xác nhận tái tạo
-    if (!window.confirm(`Bạn có chắc muốn tái tạo bảng lương cho ${payroll.teacherName} - Tháng ${payroll.month}/${payroll.year}?`)) {
-      return;
-    }
+    // Mở modal thay vì dùng confirm
+    setConfirmData({
+      paymentId: payroll.paymentId,
+      teacherName: payroll.teacherName,
+      month: payroll.month,
+      year: payroll.year
+    });
+    setShowConfirmModal(true);
+  };
 
-    setActionLoading(paymentId);
+  const handleConfirmRegenerate = async () => {
+    if (!confirmData) return;
+
+    setShowConfirmModal(false);
+    setActionLoading(confirmData.paymentId);
+
     try {
       const request = {
-        teacherId: payroll.teacherId,
-        month: payroll.month,
-        year: payroll.year
+        teacherId: payrolls.find(p => p.paymentId === confirmData.paymentId)?.teacherId || 0,
+        month: confirmData.month,
+        year: confirmData.year
       };
 
       const response: TeacherPaymentResponse = await payrollApi.regeneratePayroll(request);
@@ -337,25 +326,28 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       });
     } finally {
       setActionLoading(null);
+      setConfirmData(null);
     }
   };
 
-
   const handleFinalize = async (paymentId: number) => {
-    if (currentUser.role !== 'ADMIN') {
-      setAlert?.({
-        type: 'error',
-        message: 'Chỉ quản trị viên mới có thể chốt lương'
-      });
-      return;
-    }
-
     setActionLoading(paymentId);
     try {
+      const userStr = localStorage.getItem('user');
+      let adminId = 0;
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          adminId = user.id || 0;
+        } catch (e) {
+          console.error('Failed to parse user:', e);
+        }
+      }
+
       await payrollApi.finalizePayroll({
         paymentId: paymentId,
         payrollNote: 'Đã duyệt và chốt lương'
-      }, currentUser.id);
+      }, adminId);
       setAlert?.({
         type: 'success',
         message: 'Chốt bảng lương thành công'
@@ -371,15 +363,11 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
     }
   };
 
-  // Thêm vào sau hàm handleExport (khoảng dòng ~230)
-
-  // Export 1 bảng lương ra Excel
   const handleExportToExcel = async (paymentId: number) => {
     setActionLoading(paymentId);
     try {
       const response = await payrollApi.exportPayrollToExcel(paymentId);
 
-      // Kiểm tra response có phải là Blob không
       if (!response || !(response instanceof Blob)) {
         console.error('Response is not a Blob:', response);
         setAlert?.({
@@ -389,7 +377,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
         return;
       }
 
-      // Kiểm tra kích thước blob
       if (response.size === 0) {
         console.error('Blob is empty');
         setAlert?.({
@@ -399,7 +386,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
         return;
       }
 
-      // Tạo link download
       const url = URL.createObjectURL(response);
       const a = document.createElement('a');
       a.href = url;
@@ -407,7 +393,7 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url); // Clean up
+      URL.revokeObjectURL(url);
 
       setAlert?.({
         type: 'success',
@@ -424,24 +410,20 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
     }
   };
 
-  // Export tất cả bảng lương ra Excel
   const handleExportAllToExcel = async () => {
     setLoading(true);
     try {
       const response = await payrollApi.exportAllPayrollsToExcel();
 
-      // Kiểm tra response
       if (!response) {
         throw new Error('No response from server');
       }
 
-      // Kiểm tra response có phải là Blob không
       if (!(response instanceof Blob)) {
         console.error('Response is not a Blob:', response);
         throw new Error('Invalid response format');
       }
 
-      // Kiểm tra kích thước blob
       if (response.size === 0) {
         throw new Error('File Excel is empty');
       }
@@ -455,7 +437,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
       const filename = `danh_sach_bang_luong_${timestamp}.xlsx`;
 
-      // Tạo link download
       const url = URL.createObjectURL(response);
       const a = document.createElement('a');
       a.href = url;
@@ -479,10 +460,6 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
       setLoading(false);
     }
   };
-  const isOwner = (teacherId: number) => {
-    if (currentUser.role === 'ADMIN') return true;
-    return currentUser.id === teacherId;
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN').format(amount);
@@ -494,19 +471,13 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
 
   return (
     <div className="space-y-4">
-      {/* Role indicator and summary */}
+      {/* Summary */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-wrap items-center justify-between gap-2"
       >
         <div className="flex items-center gap-2">
-          <div className={`px-2 py-1 rounded-full text-[10px] font-medium ${currentUser.role === 'ADMIN'
-            ? 'bg-purple-50 text-purple-600'
-            : 'bg-blue-50 text-blue-600'
-            }`}>
-            {currentUser.role === 'ADMIN' ? 'Quản trị viên' : 'Giáo viên'}
-          </div>
           <div className="flex items-center gap-1 text-[11px] text-slate-500">
             <FileText className="h-3 w-3" />
             <span>{payrolls.length} bảng lương</span>
@@ -520,7 +491,9 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
           </div>
         )}
       </motion.div>
-      {currentUser.role === 'ADMIN' && payrolls.length > 0 && (
+
+      {/* Export All button */}
+      {payrolls.length > 0 && (
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -531,13 +504,14 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
           Xuất tất cả Excel
         </motion.button>
       )}
+
       {/* Premium Table */}
       <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left p-3 text-[10px] font-medium text-slate-500 uppercase tracking-wide">Mã</th>
+                <th className="text-left p-3 text-[10px] font-medium text-slate-500 uppercase tracking-wide">STT</th>
                 <th className="text-left p-3 text-[10px] font-medium text-slate-500 uppercase tracking-wide">Giáo viên</th>
                 <th className="text-left p-3 text-[10px] font-medium text-slate-500 uppercase tracking-wide">Kỳ lương</th>
                 <th className="text-left p-3 text-[10px] font-medium text-slate-500 uppercase tracking-wide">Số buổi</th>
@@ -560,7 +534,7 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
                     className="border-b border-slate-100 transition-colors duration-150"
                   >
                     <td className="p-3">
-                      <span className="font-mono text-xs font-medium text-purple-600">#{payroll.paymentId}</span>
+                      <span className="font-mono text-xs font-medium text-purple-600">#{idx + 1}</span>
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
@@ -603,101 +577,75 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
                           <Eye className="w-3.5 h-3.5" />
                         </motion.button>
 
-                        {/* 🆕 TEACHER: Reject button - Chỉ hiện khi status WAITING_TEACHER_CONFIRMATION */}
-                        {currentUser.role === 'TEACHER' &&
-                          payroll.status === 'WAITING_TEACHER_CONFIRMATION' &&
-                          isOwner(payroll.teacherId) && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleReject(payroll.paymentId)}
-                              disabled={actionLoading === payroll.paymentId}
-                              className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-50"
-                              title="Từ chối"
-                            >
-                              {actionLoading === payroll.paymentId ? (
-                                <div className="h-3.5 w-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <XCircle className="w-3.5 h-3.5" />
-                              )}
-                            </motion.button>
-                          )}
-
-                        {/* TEACHER: Confirm button */}
-                        {currentUser.role === 'TEACHER' &&
-                          payroll.status === 'WAITING_TEACHER_CONFIRMATION' &&
-                          isOwner(payroll.teacherId) && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleConfirm(payroll.paymentId)}
-                              disabled={actionLoading === payroll.paymentId}
-                              className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-50"
-                              title="Xác nhận"
-                            >
-                              {actionLoading === payroll.paymentId ? (
-                                <div className="h-3.5 w-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <CheckCircle className="w-3.5 h-3.5" />
-                              )}
-                            </motion.button>
-                          )}
-
-                        {/* 🆕 ADMIN: Regenerate button - Chỉ hiện khi status REJECTED hoặc REQUEST_ADJUSTMENT */}
-                        {currentUser.role === 'ADMIN' &&
-                          (payroll.status === 'REJECTED' || payroll.status === 'REQUEST_ADJUSTMENT') && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleRegenerate(payroll.paymentId)}
-                              disabled={actionLoading === payroll.paymentId}
-                              className="p-1.5 rounded-lg text-amber-400 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-50"
-                              title="Tái tạo"
-                            >
-                              {actionLoading === payroll.paymentId ? (
-                                <div className="h-3.5 w-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <RotateCcw className="w-3.5 h-3.5" />
-                              )}
-                            </motion.button>
-                          )}
-
-                        {/* ADMIN: Finalize button */}
-                        {currentUser.role === 'ADMIN' &&
-                          payroll.status === 'TEACHER_CONFIRMED' && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleFinalize(payroll.paymentId)}
-                              disabled={actionLoading === payroll.paymentId}
-                              className="p-1.5 rounded-lg text-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all disabled:opacity-50"
-                              title="Chốt lương"
-                            >
-                              {actionLoading === payroll.paymentId ? (
-                                <div className="h-3.5 w-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Lock className="w-3.5 h-3.5" />
-                              )}
-                            </motion.button>
-                          )}
-
-                        {/* ADMIN: Export Excel button */}
-                        {currentUser.role === 'ADMIN' && (
+                        {/* Regenerate button - Chỉ hiện khi status REJECTED hoặc REQUEST_ADJUSTMENT */}
+                        {(payroll.status === 'REJECTED' || payroll.status === 'REQUEST_ADJUSTMENT') && (
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => handleExportToExcel(payroll.paymentId)}
+                            onClick={() => handleRegenerate(payroll.paymentId)}
+                            disabled={actionLoading === payroll.paymentId}
+                            className="p-1.5 rounded-lg text-amber-400 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-50"
+                            title="Tái tạo"
+                          >
+                            {actionLoading === payroll.paymentId ? (
+                              <div className="h-3.5 w-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            )}
+                          </motion.button>
+                        )}
+
+                        {/* Finalize button - Chỉ hiện khi status TEACHER_CONFIRMED */}
+                        {payroll.status === 'TEACHER_CONFIRMED' && (
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleFinalize(payroll.paymentId)}
+                            disabled={actionLoading === payroll.paymentId}
+                            className="p-1.5 rounded-lg text-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all disabled:opacity-50"
+                            title="Chốt lương"
+                          >
+                            {actionLoading === payroll.paymentId ? (
+                              <div className="h-3.5 w-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5" />
+                            )}
+                          </motion.button>
+                        )}
+
+                        {/* Payment button - Chỉ hiện khi status FINALIZED hoặc PARTIAL_PAID */}
+                        {(payroll.status === 'FINALIZED' || payroll.status === 'PARTIAL_PAID') && (
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleOpenPaymentModal(payroll.paymentId)}
                             disabled={actionLoading === payroll.paymentId}
                             className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-50"
-                            title="Xuất Excel"
+                            title={payroll.status === 'PARTIAL_PAID' ? 'Thanh toán tiếp' : 'Xác nhận thanh toán'}
                           >
                             {actionLoading === payroll.paymentId ? (
                               <div className="h-3.5 w-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                             ) : (
-                              <FileText className="w-3.5 h-3.5" />
+                              <DollarSign className="w-3.5 h-3.5" />
                             )}
                           </motion.button>
                         )}
+
+                        {/* Export Excel button */}
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleExportToExcel(payroll.paymentId)}
+                          disabled={actionLoading === payroll.paymentId}
+                          className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-50"
+                          title="Xuất Excel"
+                        >
+                          {actionLoading === payroll.paymentId ? (
+                            <div className="h-3.5 w-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <FileText className="w-3.5 h-3.5" />
+                          )}
+                        </motion.button>
                       </div>
                     </td>
                   </motion.tr>
@@ -706,7 +654,7 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
             </tbody>
           </table>
 
-          {payrolls.length === 0 && <EmptyState role={currentUser.role} />}
+          {payrolls.length === 0 && <EmptyState />}
         </div>
       </div>
 
@@ -729,13 +677,12 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
               exit="exit"
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
-              <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] overflow-hidden shadow-xl">
+              <div className="bg-white rounded-xl max-w-2xl w-full max-h-[60vh] overflow-hidden shadow-xl">
                 {/* Modal Header */}
                 <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex justify-between items-start">
                   <div>
                     <h3 className="text-base font-semibold text-slate-800">Chi tiết bảng lương</h3>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <span className="font-mono text-xs text-purple-600">#{selectedPayroll.paymentId}</span>
                       <span className="text-slate-300 text-xs">•</span>
                       <span className="text-xs text-slate-500">{selectedPayroll.teacherName}</span>
                       <span className="text-slate-300 text-xs">•</span>
@@ -823,6 +770,100 @@ const PayrollListTab: React.FC<PayrollListTabProps> = ({ filters, refreshTrigger
           </>
         )}
       </AnimatePresence>
+
+      {/* Confirm Regenerate Modal */}
+      <AnimatePresence>
+        {showConfirmModal && confirmData && (
+          <>
+            <motion.div
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+              onClick={() => {
+                setShowConfirmModal(false);
+                setConfirmData(null);
+              }}
+            />
+            <motion.div
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-xl">
+                {/* Modal Header */}
+                <div className="bg-amber-50 border-b border-amber-100 px-6 py-4 flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800">Xác nhận tái tạo</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Bạn có chắc muốn tái tạo bảng lương này?
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modal Content */}
+                <div className="px-6 py-4">
+                  <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Giáo viên:</span>
+                      <span className="font-medium text-slate-700">{confirmData.teacherName}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Kỳ lương:</span>
+                      <span className="font-medium text-slate-700">Tháng {confirmData.month}/{confirmData.year}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-3 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Hành động này sẽ tạo một phiên bản mới của bảng lương
+                  </p>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="border-t border-slate-100 px-6 py-3 flex justify-end gap-2">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setShowConfirmModal(false);
+                      setConfirmData(null);
+                    }}
+                    className="px-4 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-sm font-medium hover:bg-slate-50 transition-all"
+                  >
+                    Hủy
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleConfirmRegenerate}
+                    className="px-4 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-all"
+                  >
+                    Xác nhận tái tạo
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <PaymentModal
+        visible={showPaymentModal}
+        payroll={selectedPayrollForPayment}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedPayrollForPayment(null);
+        }}
+        onSuccess={() => {
+          fetchPayrolls();
+        }}
+      />
     </div>
   );
 };

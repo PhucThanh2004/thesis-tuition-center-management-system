@@ -91,7 +91,7 @@ export const ConfirmPayrollModal = ({ isOpen, onClose, onConfirm, loading, payro
               onClick={(e) => e.stopPropagation()}
             >
               {/* Premium Gradient Border Top */}
-              <div className="absolute top-0 left-0 right-0 h-1.5 btn-gradient from-amber-400 via-amber-500 to-amber-600" />
+              <div className="absolute top-0 left-0 right-0 h-1.5 from-amber-400 via-amber-500 to-amber-600" />
 
               {/* Header */}
               <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white">
@@ -124,7 +124,7 @@ export const ConfirmPayrollModal = ({ isOpen, onClose, onConfirm, loading, payro
                 >
                   <div className="relative">
                     <div className="absolute inset-0 bg-amber-400 rounded-full blur-xl opacity-30 animate-pulse" />
-                    <div className="relative w-16 h-16 btn-gradient from-amber-100 to-amber-50 rounded-full flex items-center justify-center shadow-md">
+                    <div className="relative w-16 h-16 bg-gradient from-amber-100 to-amber-50 rounded-full flex items-center justify-center shadow-md">
                       <AlertTriangle size={32} className="text-amber-600" />
                     </div>
                   </div>
@@ -136,7 +136,7 @@ export const ConfirmPayrollModal = ({ isOpen, onClose, onConfirm, loading, payro
                     variants={contentVariants}
                     initial="hidden"
                     animate="visible"
-                    className="mb-5 rounded-xl btn-gradient from-slate-50 to-white border border-slate-200 shadow-sm overflow-hidden"
+                    className="mb-5 rounded-xl bg-gradient from-slate-50 to-white border border-slate-200 shadow-sm overflow-hidden"
                   >
                     {/* Card Header */}
                     <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
@@ -194,7 +194,7 @@ export const ConfirmPayrollModal = ({ isOpen, onClose, onConfirm, loading, payro
                           Tổng tiền
                         </span>
                         <div className="text-right">
-                          <span className="text-xl font-bold btn-gradient from-emerald-600 to-emerald-500 bg-clip-text text-transparent">
+                          <span className="text-xl font-bold bg-gradient from-emerald-600 to-emerald-500 bg-clip-text gradient-text">
                             {formatCurrency(payroll.amount)}
                           </span>
                         </div>
@@ -254,7 +254,7 @@ export const ConfirmPayrollModal = ({ isOpen, onClose, onConfirm, loading, payro
               </div>
 
               {/* Decorative Bottom Gradient */}
-              <div className="absolute bottom-0 left-0 right-0 h-1 btn-gradient from-transparent via-slate-100 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 h-1  from-transparent via-slate-100 to-transparent" />
             </motion.div>
           </div>
         </>

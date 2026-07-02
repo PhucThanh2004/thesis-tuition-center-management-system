@@ -75,3 +75,55 @@ export interface GetAttendanceStatisticsParams {
   studentId: number
   subjectId: number
 }
+
+export interface AttendanceExportItem {
+  studentId: number
+  studentName: string
+  studentEmail: string
+  grade: string
+  schoolName: string
+  status: string
+  note: string | null
+  sessionDate: string
+  startTime: string
+  endTime: string
+  subjectName: string
+  subjectId: string
+  roomName: string
+}
+
+export type ExportFormat = 'excel' | 'csv'
+
+// ==================== NEW TYPES FOR IMPORT ====================
+
+export interface AttendanceImportItem {
+  studentId: number
+  subjectId: number
+  sessionDate: string  // YYYY-MM-DD
+  status: string       // present | late | absent
+  note: string | null
+}
+
+export interface ImportError {
+  rowNumber: number
+  data: AttendanceImportItem
+  errorMessage: string
+}
+
+export interface ImportResult {
+  successCount: number
+  errorCount: number
+  errors: ImportError[]
+  message: string
+  totalRecords: number
+  status: 'success' | 'partial_success' | 'error'
+}
+
+export interface ImportResponse {
+  message: string
+  success_count: number
+  error_count: number
+  total_records: number
+  errors: ImportError[]
+  status: 'success' | 'partial_success' | 'error'
+}

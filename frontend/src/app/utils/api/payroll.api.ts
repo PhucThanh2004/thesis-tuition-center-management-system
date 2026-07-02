@@ -12,15 +12,17 @@ import type {
   MonthlyPayrollStats,
   TeacherPayrollSummary,
   TeacherPayrollRejectRequest,
-  TeacherPaymentResponse
+  TeacherPaymentResponse,
+  PayrollPaymentRequest,
+  PayrollPaymentResponse
 } from '../types/payroll';
 
 const logRequest = (method: string, url: string, params?: any, data?: any) => {
-  console.log(`📤 ${method} ${url}`, { params, data });
+  console.log(`${method} ${url}`, { params, data });
 };
 
 const logError = (method: string, url: string, error: any) => {
-  console.error(`❌ ${method} ${url} - Error:`, error.response?.data || error.message);
+  console.error(`${method} ${url} - Error:`, error.response?.data || error.message);
 };
 
 
@@ -178,13 +180,17 @@ export const payrollApi = {
     });
   },
 
+  processPayment(request: PayrollPaymentRequest): Promise<PayrollPaymentResponse> {
+    logRequest('POST', '/payroll/pay', undefined, request);
+    return axios.post('/payroll/pay', request);
+  },
   // ========== Utility Functions ==========
   async checkPayrollExists(teacherId: number, month: number, year: number): Promise<boolean> {
     try {
       const payrolls = await this.getAllPayrolls();
       return payrolls.some(p => p.teacherId === teacherId && p.month === month && p.year === year);
     } catch (error) {
-      console.error('❌ API checkPayrollExists error:', error);
+      console.error('API checkPayrollExists error:', error);
       return false;
     }
   },

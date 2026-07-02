@@ -17,8 +17,9 @@ import type {
   PayrollFilter, PayrollStats as StatsType, PayrollListItem, TeacherPayrollRejectRequest, TeacherPaymentResponse
 } from '../../../utils/types/payroll';
 import { payrollApi } from '../../../utils/api/payroll.api';
+import PayrollPaidTab from './PayrollPaidTab';
 
-type TabType = 'preview' | 'list' | 'waiting' | 'finalized' | 'rejected';
+type TabType = 'preview' | 'list' | 'waiting' | 'finalized' | 'rejected' | 'paid';
 interface PayrollModuleProps {
   mode?: 'create';
 }
@@ -216,7 +217,7 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode }) => {
             <PayrollHeader onCreatePayroll={handleCreatePayroll} />
           </motion.div>
 
-         
+
           {/* Stats Cards */}
           <motion.div variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
             <PayrollStats stats={stats} loading={loading} />
@@ -310,6 +311,20 @@ const PayrollModule: React.FC<PayrollModuleProps> = ({ mode }) => {
                   exit="exit"
                 >
                   <PayrollFinalizedTab
+                    refreshTrigger={refreshTrigger}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'paid' && (
+                <motion.div
+                  key="paid"
+                  variants={tabContentVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                >
+                  <PayrollPaidTab
                     refreshTrigger={refreshTrigger}
                   />
                 </motion.div>

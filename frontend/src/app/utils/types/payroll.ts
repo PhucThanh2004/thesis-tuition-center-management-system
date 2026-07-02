@@ -12,7 +12,7 @@ export type TeacherPaymentStatus =
   | 'REQUEST_ADJUSTMENT'
   | 'FINALIZED'
   | 'PAID'
-
+  | 'PARTIAL_PAID'
 // ========== Response Types từ API ==========
 export interface PayrollPreviewResponse {
   teacherId: number;
@@ -31,6 +31,7 @@ export interface PayrollDetailResponse {
   month: number;
   year: number;
   amount: number;
+  paidAmount: number; 
   totalSessions: number;
   status: TeacherPaymentStatus;
   paymentDate: string;
@@ -39,6 +40,9 @@ export interface PayrollDetailResponse {
   lastAdjustmentReason?: string;
   adjustedAt?: string;
   details: PayrollSessionDetail[];
+  teacherFeedback?: string;
+  teacherRejectedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface TeacherPayment {
@@ -124,6 +128,7 @@ export interface SessionTeacher {
 
 // ========== UI Types ==========
 export interface PayrollSessionDetail {
+  id?: number;
   sessionTeacherId: number;
   sessionId: number;
   subjectName: string;
@@ -162,6 +167,7 @@ export interface PayrollStats {
   confirmedCount: number;
   rejectedCount?: number;
   finalizedCount: number;
+    partialPaidCount?: number;
   paidCount: number;
   completionRate: number;    // ✅ Thêm dòng này
   //growthPercentage: number;  
@@ -248,10 +254,13 @@ export interface PayrollListItem {
   month: number;
   year: number;
   amount: number;
+  paidAmount?: number; 
+  remainingAmount?: number;
   totalSessions: number;
   status: TeacherPaymentStatus;
   paymentDate: string;
   revisionNo?: number;
+  feedback?: string;
 }
 
 export interface MonthlyPayrollTeacherDTO {
@@ -329,4 +338,34 @@ export interface TeacherPaymentResponse {
   amount: number;
   status: string;
   revisionNo: number;
+}
+
+
+export interface PayrollPaymentRequest {
+  paymentId: number;
+  paidAmount?: number;      
+  paymentNote?: string;        
+  paymentDate?: string;     
+  detailIds?: number[];        
+  payAllDetails?: boolean;     
+}
+
+export interface PaymentDetailStatusDTO {
+  detailId: number;
+  subjectName: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  fullyPaid: boolean;
+}
+
+export interface PayrollPaymentResponse {
+  paymentId: number;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: TeacherPaymentStatus;
+  paymentDate: string;
+  paymentNote?: string;
+  detailStatuses?: PaymentDetailStatusDTO[];
 }

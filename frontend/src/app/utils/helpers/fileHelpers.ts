@@ -1,6 +1,6 @@
 // utils/fileHelpers.ts
-import { FileText, File, Video, LucideIcon } from "lucide-react";
-
+import { FileText, File, Video } from "lucide-react";
+import type { LucideIcon } from 'lucide-react';
 export interface FileStyle {
   icon: LucideIcon;
   iconBg: string;

@@ -464,7 +464,7 @@ export function StudentManagementPage() {
             <div className="space-y-6 sticky top-6">
               <QuickActions onAddStudent={handleAddStudent}
                onExport={() => handleBulkAction('export')} />
-              <RecentActivities activities={[]} />
+              <RecentActivities/>
 
             </div>
           </div>

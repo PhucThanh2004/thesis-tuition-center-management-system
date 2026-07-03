@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  BookOpen, Bell, MessageSquare, User, LogOut, ChevronDown, Calendar, 
-  Menu, X, Settings, Pin, PinOff, CheckCheck, MoreHorizontal, Check, EyeOff 
+import {
+  BookOpen, Bell, MessageSquare, User, LogOut, ChevronDown, Calendar,
+  Menu, X, Settings, Pin, PinOff, CheckCheck, MoreHorizontal, Check, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -29,11 +29,13 @@ const GoogleTooltip = ({ children, text }: { children: React.ReactNode; text: st
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  //const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  
   const showTooltip = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
+
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setPosition({
@@ -79,13 +81,13 @@ const GoogleTooltip = ({ children, text }: { children: React.ReactNode; text: st
 };
 
 // Dropdown menu component cho từng activity
-const ActivityMenu = ({ 
-  activityId, 
-  isRead, 
-  onMarkAsRead 
-}: { 
-  activityId: number; 
-  isRead: boolean; 
+const ActivityMenu = ({
+  activityId,
+  isRead,
+  onMarkAsRead
+}: {
+  activityId: number;
+  isRead: boolean;
   onMarkAsRead: (id: number) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -112,7 +114,7 @@ const ActivityMenu = ({
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
-      
+
       {isOpen && (
         <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
           {!isRead ? (
@@ -147,7 +149,9 @@ export function TeacherHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  //const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -155,7 +159,7 @@ export function TeacherHeader() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  
+
   // State for header visibility and pin
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(() => {
@@ -167,7 +171,7 @@ export function TeacherHeader() {
   // Save pin state to localStorage
   useEffect(() => {
     localStorage.setItem('teacherHeaderPinned', JSON.stringify(isPinned));
-    
+
     if (isPinned) {
       setIsHeaderVisible(true);
     }
@@ -176,21 +180,21 @@ export function TeacherHeader() {
   // Handle mouse movement near top edge (only when not pinned)
   useEffect(() => {
     if (isPinned) return;
-    
+
     const handleMouseMove = (event: MouseEvent) => {
       const mouseY = event.clientY;
       const isNearTop = mouseY <= 50;
-      
+
       if (isNearTop && !isHoveringTop) {
         setIsHoveringTop(true);
         setIsHeaderVisible(true);
-        
+
         if (hoverTimeoutRef.current) {
           clearTimeout(hoverTimeoutRef.current);
         }
       } else if (!isNearTop && isHoveringTop) {
         setIsHoveringTop(false);
-        
+
         hoverTimeoutRef.current = setTimeout(() => {
           if (!showUserMenu && !isMenuOpen) {
             setIsHeaderVisible(false);
@@ -198,7 +202,7 @@ export function TeacherHeader() {
         }, 500);
       }
     };
-    
+
     const handleMouseLeaveWindow = () => {
       if (isHeaderVisible && !showUserMenu && !isMenuOpen && !isPinned) {
         hoverTimeoutRef.current = setTimeout(() => {
@@ -206,10 +210,10 @@ export function TeacherHeader() {
         }, 300);
       }
     };
-    
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseleave', handleMouseLeaveWindow);
-    
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseleave', handleMouseLeaveWindow);
@@ -228,7 +232,7 @@ export function TeacherHeader() {
   useEffect(() => {
     if (showUserMenu || isMenuOpen) {
       setIsHeaderVisible(true);
-      
+
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
@@ -271,16 +275,16 @@ export function TeacherHeader() {
   // Handle mark all as read
   const handleMarkAllAsRead = async () => {
     if (!user) return;
-    
+
     try {
       setMarkingAllRead(true);
       await activityLogApi.markAllAsRead(user.id);
-      
+
       // Cập nhật state: đánh dấu tất cả đã đọc
-      setActivities(prev => 
+      setActivities(prev =>
         prev.map(activity => ({ ...activity, isRead: true }))
       );
-      
+
       console.log('Đã đánh dấu tất cả thông báo đã đọc');
     } catch (err) {
       console.error('Error marking all as read:', err);
@@ -293,16 +297,16 @@ export function TeacherHeader() {
   const handleMarkAsRead = async (activityId: number) => {
     try {
       await activityLogApi.markAsRead(activityId);
-      
+
       // Cập nhật state: đánh dấu 1 thông báo đã đọc
-      setActivities(prev => 
-        prev.map(activity => 
-          activity.id === activityId 
-            ? { ...activity, isRead: true } 
+      setActivities(prev =>
+        prev.map(activity =>
+          activity.id === activityId
+            ? { ...activity, isRead: true }
             : activity
         )
       );
-      
+
       console.log(`Đã đánh dấu thông báo ${activityId} đã đọc`);
     } catch (err) {
       console.error('Error marking as read:', err);
@@ -317,7 +321,7 @@ export function TeacherHeader() {
   const navigateToPage = (path: string) => {
     if (path !== '#') navigate(path);
     setIsMenuOpen(false);
-    
+
     if (!isPinned) {
       setIsHeaderVisible(true);
       setTimeout(() => {
@@ -374,7 +378,7 @@ export function TeacherHeader() {
     <>
       {/* Small invisible hit area at the top for easier hover detection */}
       {!isPinned && (
-        <div 
+        <div
           className="fixed top-0 left-0 right-0 z-40"
           style={{ height: '8px' }}
           onMouseEnter={() => {
@@ -383,14 +387,13 @@ export function TeacherHeader() {
           }}
         />
       )}
-      
+
       {/* Spacer div to prevent content jump */}
       <div className={`transition-all duration-300 `} />
-      
+
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
-          isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
-        } ${scrolled ? 'shadow-lg' : ''}`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
+          } ${scrolled ? 'shadow-lg' : ''}`}
         style={{
           backgroundColor: 'rgba(255,255,255,0.95)',
           backdropFilter: 'blur(10px)',
@@ -430,9 +433,8 @@ export function TeacherHeader() {
                 <div key={link.label} className="relative group">
                   <button
                     onClick={() => !link.children && navigateToPage(link.path)}
-                    className={`nav-link font-semibold text-sm transition-all flex items-center gap-1 ${
-                      isActive(link.path) ? 'gradient-text font-semibold' : 'text-gray-600 hover:text-gray-800'
-                    }`}
+                    className={`nav-link font-semibold text-sm transition-all flex items-center gap-1 ${isActive(link.path) ? 'gradient-text font-semibold' : 'text-gray-600 hover:text-gray-800'
+                      }`}
                   >
                     {link.label}
                     {link.children && (
@@ -463,7 +465,7 @@ export function TeacherHeader() {
               <div className="relative group">
                 <button className="relative p-2 sm:p-2.5 text-gray-500 hover:text-[#667eea] hover:bg-indigo-50 rounded-xl transition-all duration-300 active:scale-95">
                   <Bell className="w-5 h-6 transition-transform group-hover:rotate-[15deg]" />
-                  
+
                   {/* Badge số lượng thông báo chưa đọc */}
                   {unreadCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center">
@@ -482,11 +484,10 @@ export function TeacherHeader() {
                     <button
                       onClick={handleMarkAllAsRead}
                       disabled={markingAllRead || unreadCount === 0}
-                      className={`text-xs font-medium transition-colors flex items-center gap-1 ${
-                        unreadCount === 0 
-                          ? 'text-gray-400 cursor-not-allowed' 
+                      className={`text-xs font-medium transition-colors flex items-center gap-1 ${unreadCount === 0
+                          ? 'text-gray-400 cursor-not-allowed'
                           : 'text-[#667eea] hover:underline'
-                      }`}
+                        }`}
                     >
                       {markingAllRead ? (
                         <>
@@ -501,7 +502,7 @@ export function TeacherHeader() {
                       )}
                     </button>
                   </div>
-                  
+
                   <div className="max-h-[300px] overflow-y-auto">
                     {loading ? (
                       <div className="p-8 text-center">
@@ -518,15 +519,14 @@ export function TeacherHeader() {
                         const meta = getMetaSafe(activity.meta);
                         const isCurrentUser = activity.userId === user?.id;
                         const isUnread = !activity.isRead;
-                        
+
                         return (
                           <div
                             key={activity.id}
-                            className={`p-4 hover:bg-gray-50 transition-colors flex gap-3 border-b border-gray-50 group ${
-                              isUnread ? 'bg-blue-50 hover:bg-blue-100' : ''
-                            }`}
+                            className={`p-4 hover:bg-gray-50 transition-colors flex gap-3 border-b border-gray-50 group ${isUnread ? 'bg-blue-50 hover:bg-blue-100' : ''
+                              }`}
                           >
-                            <div 
+                            <div
                               className="flex-1 min-w-0 cursor-pointer"
                               onClick={() => {
                                 if (isUnread) {
@@ -556,13 +556,13 @@ export function TeacherHeader() {
                                     </span>
                                     {' '}{activity.description}
                                   </p>
-                                  
+
                                   {meta?.title && (
                                     <p className="text-xs text-indigo-500 mt-1 font-medium truncate">
                                       📌 {meta.title}
                                     </p>
                                   )}
-                                
+
                                   <div className="flex items-center justify-between mt-1">
                                     <span className="text-[11px] text-gray-400">
                                       {formatRelativeTime(activity.createdAt)}
@@ -590,7 +590,7 @@ export function TeacherHeader() {
                       })
                     )}
                   </div>
-                  
+
                   <button
                     onClick={() => navigate('/teacher/announcements')}
                     className="w-full p-3 text-center text-sm font-semibold text-gray-600 hover:text-[#667eea] border-t border-gray-100 transition-colors"
@@ -609,9 +609,8 @@ export function TeacherHeader() {
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-1.5 p-1 pr-2 rounded-full hover:bg-gray-50 transition-all duration-200 border border-transparent hover:border-gray-100 group"
                   >
-                    <div className={`w-9 h-9 rounded-full ring-2 p-0.5 transition-all duration-300 overflow-hidden ${
-                      showUserMenu ? 'ring-indigo-500 shadow-md' : 'ring-gray-100 group-hover:ring-indigo-200'
-                    }`}>
+                    <div className={`w-9 h-9 rounded-full ring-2 p-0.5 transition-all duration-300 overflow-hidden ${showUserMenu ? 'ring-indigo-500 shadow-md' : 'ring-gray-100 group-hover:ring-indigo-200'
+                      }`}>
                       {user?.image ? (
                         <img
                           src={getImageSrc(user.image) || ''}
@@ -631,9 +630,8 @@ export function TeacherHeader() {
                       )}
                     </div>
                     <ChevronDown
-                      className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${
-                        showUserMenu ? 'rotate-180' : ''
-                      }`}
+                      className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${showUserMenu ? 'rotate-180' : ''
+                        }`}
                     />
                   </button>
 
@@ -641,11 +639,10 @@ export function TeacherHeader() {
                   <GoogleTooltip text={isPinned ? "Đã ghim thanh điều hướng" : "Ghim thanh điều hướng"}>
                     <button
                       onClick={togglePin}
-                      className={`p-2 rounded-lg transition-all duration-300 active:scale-95 ${
-                        isPinned 
-                          ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200' 
+                      className={`p-2 rounded-lg transition-all duration-300 active:scale-95 ${isPinned
+                          ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
                           : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
-                      }`}
+                        }`}
                     >
                       {isPinned ? (
                         <Pin className="w-4 h-4" />
@@ -685,7 +682,7 @@ export function TeacherHeader() {
 
                     {/* Pin option in user menu */}
                     <div className="my-2 border-t border-gray-50" />
-                    
+
                     <div className="px-2">
                       <MenuAction
                         icon={isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
@@ -729,9 +726,8 @@ export function TeacherHeader() {
                 <div key={link.label}>
                   <button
                     onClick={() => !link.children && navigateToPage(link.path)}
-                    className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-all ${
-                      isActive(link.path) ? 'bg-indigo-50 gradient-text' : 'text-gray-600'
-                    }`}
+                    className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-all ${isActive(link.path) ? 'bg-indigo-50 gradient-text' : 'text-gray-600'
+                      }`}
                   >
                     {link.label}
                   </button>
@@ -750,7 +746,7 @@ export function TeacherHeader() {
                   )}
                 </div>
               ))}
-              
+
               {/* Pin option in mobile menu */}
               <button
                 onClick={togglePin}

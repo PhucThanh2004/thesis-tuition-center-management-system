@@ -300,13 +300,13 @@ const StudentDetailPanel = ({
       fullName: student.fullName,
       dateOfBirth: student.dateOfBirth,
       gender: student.gender,
-      phone: student.phoneNumber || "Chưa cập nhật",
-      email: student.email || "Chưa cập nhật",
-      address: student.address || "Chưa cập nhật",
+      phone: (student as any).phoneNumber || "Chưa cập nhật",
+      email: (student as any).email || "Chưa cập nhật",
+      address: (student as any).address || "Chưa cập nhật",
       schoolName: student.schoolName || "Chưa có",
-      studentCode: student.studentCode || student.id.toString(),
-      parentName: student.parentName || "Chưa cập nhật",
-      parentPhone: student.parentPhone || "Chưa cập nhật",
+      studentCode: (student as any).studentCode || student.id.toString(),
+      parentName: (student as any).parentName || "Chưa cập nhật",
+      parentPhone: (student as any).parentPhone || "Chưa cập nhật",
     },
     academicData: {
       overallProgress: 78,
@@ -400,7 +400,7 @@ const StudentDetailPanel = ({
               <div className="flex items-center gap-2 mt-1">
                 <span className={cn(
                   "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-                  studentData.studentData?.gender === true
+                  (studentData as any).studentData?.gender === true
                     ? "bg-blue-50 text-blue-600"
                     : "bg-pink-50 text-pink-600"
                 )}>

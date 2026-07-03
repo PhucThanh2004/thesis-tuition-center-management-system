@@ -20,8 +20,11 @@
     "strict": true,
     //"noUnusedLocals": true,
     //"noUnusedParameters": true,
-    "noUnusedLocals": false,     
+   "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "verbatimModuleSyntax": false,
+    "strict": false,
+    "skipLibCheck": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true

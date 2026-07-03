@@ -35,15 +35,13 @@ export function LoginModal({
             const res = await loginApi(email, password);
             const { user, token } = res;
 
-            // Lưu token
-            localStorage.setItem('token', token);
+            // ✅ Lưu token với key đúng
+            localStorage.setItem('accessToken', token); // Sửa từ 'token' thành 'accessToken'
             api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-            // Cập nhật context
             login(user);
             onClose();
 
-            // Điều hướng theo roleId
             if (user.roleId === 'R0') {
                 navigate('/admin/home');
             } else if (user.roleId === 'R1') {

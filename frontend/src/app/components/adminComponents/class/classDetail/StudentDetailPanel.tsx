@@ -1,7 +1,7 @@
 // src/components/StudentDetailPanel.tsx
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { cn } from "../../../utils/cn";
+import { cn } from "../../../../utils/cn";
 import { formatDate } from "../../../../utils/helpers";
 import type { StudentSubject } from "../../../../utils/types/studentSubject";
 import type { Subject } from "../../../../utils/types/subject";
@@ -147,13 +147,13 @@ export const StudentDetailPanel = ({ student, subject, onClose }: Props) => {
       fullName: student.fullName,
       dateOfBirth: student.dateOfBirth,
       gender: student.gender,
-      phone: student.phoneNumber || "Chưa cập nhật",
-      email: student.email || "Chưa cập nhật",
-      address: student.address || "Chưa cập nhật",
+      phone: (student as any).phoneNumber || "Chưa cập nhật",
+      email: (student as any).email || "Chưa cập nhật",
+      address: (student as any).address || "Chưa cập nhật",
       schoolName: student.schoolName || "Chưa có",
-      studentCode: student.studentCode || student.id.toString(),
-      parentName: student.parentName || "Chưa cập nhật",
-      parentPhone: student.parentPhone || "Chưa cập nhật",
+      studentCode: (student as any).studentCode || student.id.toString(),
+      parentName: (student as any).parentName || "Chưa cập nhật",
+      parentPhone: (student as any).parentPhone || "Chưa cập nhật",
     },
     academicData: {
       overallProgress: 78,

@@ -33,7 +33,7 @@ export type BillingType =
   (typeof BillingType)[keyof typeof BillingType]
 
 export const PaymentPlanType = {
-  FULL: 'FULL',
+  ONE_TIME: 'ONE_TIME',
   INSTALLMENT: 'INSTALLMENT'
 } as const
 

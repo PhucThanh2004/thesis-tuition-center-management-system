@@ -245,7 +245,7 @@ export const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, m
     // Xử lý khi thay đổi paymentPlanType
     const handlePaymentPlanChange = (value: PaymentPlanType | undefined) => {
         handleInputChange('paymentPlanType', value);
-        if (value === 'FULL') {
+        if (value === 'ONE_TIME') {
             handleInputChange('installmentCount', undefined);
         }
         if (value === 'INSTALLMENT' && !formData.installmentCount) {
@@ -274,7 +274,7 @@ export const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, m
     // Lấy label cho payment plan
     const getPaymentPlanLabel = (type: PaymentPlanType | undefined) => {
         if (!type) return 'Chưa chọn';
-        return type === 'FULL' ? 'Trả toàn bộ' : 'Trả góp';
+        return type === 'ONE_TIME' ? 'Trả toàn bộ' : 'Trả góp';
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

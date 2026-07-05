@@ -1,42 +1,20 @@
-import axios from 'axios'
-import type { AxiosResponse } from 'axios'
-
-
-const instance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL,
-  withCredentials: true,
-})
-
-instance.interceptors.response.use(
-   (res: AxiosResponse) => res.data,
-  err => {
-    if (err.response?.status === 401) {
-      window.location.href = '/'
-    }
-    return Promise.reject(err)
-  }
-)
-
-
-export default instance
-
-/*
 // src/utils/axios.ts
 import axios from 'axios'
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL,
-  withCredentials: false,
+  baseURL: import.meta.env.VITE_BACKEND_URL || 'https://backend-tuitioncentermanagement.onrender.com',
+  withCredentials: true, // ✅ Quan trọng cho CORS
   timeout: 30000,
 })
 
-// ✅ THÊM INTERCEPTOR NÀY - GỬI TOKEN
+// ✅ INTERCEPTOR REQUEST - GỬI TOKEN
 instance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('accessToken')
+    // Lấy token từ localStorage với key đúng
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
     
-    console.log('🔑 [axios] Token:', token ? token.substring(0, 20) + '...' : 'No token')
+    console.log('🔑 [axios] Token:', token ? `${token.substring(0, 20)}...` : 'No token')
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -60,7 +38,7 @@ instance.interceptors.request.use(
   }
 )
 
-// ✅ GIỮ NGUYÊN response interceptor (có thể cải thiện)
+// ✅ INTERCEPTOR RESPONSE
 instance.interceptors.response.use(
   (res: AxiosResponse) => {
     console.log('📥 [axios] Response:', {
@@ -68,7 +46,7 @@ instance.interceptors.response.use(
       status: res.status,
       data: res.data,
     })
-    return res.data
+    return res.data // Trả về data luôn
   },
   (error) => {
     console.error('❌ [axios] Response error:', {
@@ -82,14 +60,14 @@ instance.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn('⚠️ Token expired or invalid, redirecting to login')
       localStorage.removeItem('accessToken')
+      localStorage.removeItem('token') // Xóa cả 2 key
       localStorage.removeItem('user')
-      window.location.href = '/login'  // Chuyển về login
+      window.location.href = '/login'
     }
     
     // Xử lý 403 - Forbidden
     if (error.response?.status === 403) {
       console.warn('⚠️ Forbidden - User lacks permission')
-      // Có thể hiển thị toast thông báo
     }
     
     return Promise.reject(error)
@@ -97,4 +75,3 @@ instance.interceptors.response.use(
 )
 
 export default instance
-*/

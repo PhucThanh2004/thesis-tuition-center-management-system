@@ -1,4 +1,4 @@
-/*import axios from 'axios'
+import axios from 'axios'
 import type { AxiosResponse } from 'axios'
 
 
@@ -19,8 +19,8 @@ instance.interceptors.response.use(
 
 
 export default instance
-*/
 
+/*
 // src/utils/axios.ts
 import axios from 'axios'
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
@@ -97,3 +97,4 @@ instance.interceptors.response.use(
 )
 
 export default instance
+*/

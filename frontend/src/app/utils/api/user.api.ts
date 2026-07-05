@@ -33,9 +33,16 @@ export const userApi = {
     const formData = new FormData()
     formData.append('image', file)
 
-    return axios.put('/profile/image', formData)
+    // ✅ Lấy token từ localStorage
+    const token = localStorage.getItem('token')
+    
+    return axios.put('/profile/image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
+      }
+    })
   },
-
  changePassword(
   data: ChangePasswordRequest
 ): Promise<ChangePasswordResponse> {

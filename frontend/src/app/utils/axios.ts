@@ -27,11 +27,8 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
 const instance = axios.create({
   baseURL: import.meta.env.VITE_BACKEND_URL,
-  withCredentials: true,
+  withCredentials: false,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 // ✅ THÊM INTERCEPTOR NÀY - GỬI TOKEN

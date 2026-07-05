@@ -27,34 +27,55 @@ export function LoginModal({
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
+        e.preventDefault()
+        setLoading(true)
+        setError(null)
 
         try {
-            const res = await loginApi(email, password);
-            const { user, token } = res;
+            console.log('🔐 [LoginModal] Submitting login...')
+            const res = await loginApi(email, password)
+            console.log('✅ [LoginModal] Login response:', res)
 
-            // ✅ Lưu token với key đúng
-            localStorage.setItem('accessToken', token); // Sửa từ 'token' thành 'accessToken'
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            // ✅ Kiểm tra response structure
+            let token: string | undefined
+            let user: any
 
-            login(user);
-            onClose();
-
-            if (user.roleId === 'R0') {
-                navigate('/admin/home');
-            } else if (user.roleId === 'R1') {
-                navigate('/teacher/classes');
+            if (res.data && res.data.token && res.data.user) {
+                // Response có data wrapper
+                token = res.data.token
+                user = res.data.user
+            } else if (res.token && res.user) {
+                // Response trực tiếp
+                token = res.token
+                user = res.user
             } else {
-                navigate('/');
+                throw new Error('Invalid response structure')
+            }
+
+            console.log('🔑 [LoginModal] Token received:', token ? 'Yes' : 'No')
+            console.log('👤 [LoginModal] User received:', user)
+
+            // ✅ Gọi login từ AuthContext với token
+            login(user, token)
+
+            // ✅ Đóng modal
+            onClose()
+
+            // ✅ Chuyển hướng dựa trên role
+            if (user.roleId === 'R0') {
+                navigate('/admin/home')
+            } else if (user.roleId === 'R1') {
+                navigate('/teacher/classes')
+            } else {
+                navigate('/')
             }
         } catch (err: any) {
-            setError(err?.response?.data?.message || 'Sai email hoặc mật khẩu');
+            console.error('❌ [LoginModal] Login error:', err)
+            setError(err?.response?.data?.message || err?.message || 'Sai email hoặc mật khẩu')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

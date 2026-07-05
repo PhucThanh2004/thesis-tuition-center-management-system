@@ -558,9 +558,9 @@ export const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, m
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => handlePaymentPlanChange('FULL')}
+                                                onClick={() => handlePaymentPlanChange('ONE_TIME')}
                                                 className={`flex-1 h-11 px-3 rounded-xl text-sm font-medium transition-all ${
-                                                    formData.paymentPlanType === 'FULL'
+                                                    formData.paymentPlanType === 'ONE_TIME'
                                                         ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
                                                         : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
                                                 }`}
@@ -596,7 +596,7 @@ export const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, m
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400">kỳ</span>
                                             </div>
                                         )}
-                                        {formData.paymentPlanType === 'FULL' && (
+                                        {formData.paymentPlanType === 'ONE_TIME' && (
                                             <p className="text-[10px] text-slate-400 px-1">Thanh toán một lần duy nhất</p>
                                         )}
                                         {formData.paymentPlanType === 'INSTALLMENT' && !formData.installmentCount && (

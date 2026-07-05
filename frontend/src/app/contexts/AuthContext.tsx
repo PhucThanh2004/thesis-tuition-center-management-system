@@ -7,10 +7,10 @@ interface User {
   email: string
   phoneNumber: string
   roleId: string
-  gender?: boolean | null
+  gender?: boolean | null 
   image?: string
-  createdAt?: string
-  passwordUpdatedAt?: string
+  createdAt?: string 
+  passwordUpdatedAt?: string 
 }
 
 interface AuthContextType {
@@ -26,20 +26,15 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const TOKEN_KEY = 'accessToken'
-  const token = localStorage.getItem(TOKEN_KEY);
+
+  // Khôi phục token từ localStorage
+  const token = localStorage.getItem('token');
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
 
+  // verify token khi app load
   useEffect(() => {
-    // Kiểm tra token trước khi gọi API
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     api
       .get('/auth/me')
       .then(res => {
@@ -48,7 +43,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       })
       .catch(() => {
         setUser(null)
-        localStorage.removeItem(TOKEN_KEY);
       })
       .finally(() => setLoading(false))
   }, [])
@@ -64,8 +58,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Logout error', err)
     } finally {
       setUser(null)
-      localStorage.removeItem(TOKEN_KEY); // ✅ Xóa token khi logout
-      delete api.defaults.headers.common['Authorization'];
     }
   }
 
